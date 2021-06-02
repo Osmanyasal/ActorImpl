@@ -5,41 +5,67 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import lombok.Data;
 import lombok.experimental.Accessors;
+import philosophers.arge.actor.ControlBlock.Status;
 
 @Data
 @Accessors(chain = true)
-public class ActorCluster {
+public class ActorCluster implements Terminable {
 
 	private String name;
-	private RouterNode<RouterMessage<Object>> router;
+	private RouterNode<Object> router;
 	private Object gateway;
-	private Type type;
 	private ExecutorService pool;
 	private List<Future<?>> futures;
+	private ControlBlock cb;
 
 	public ActorCluster(ClusterConfig config) {
 		this.name = config.getName();
-		pool = Executors.newFixedThreadPool(config.getThreadCount());
-		futures = new ArrayList<>();
-		type = Type.CLUSTER;
-		router = new RouterNode<RouterMessage<Object>>(this);
+		this.pool = Executors.newFixedThreadPool(config.getThreadCount());
+		this.futures = new ArrayList<>();
+		this.cb = new ControlBlock(ActorType.CLUSTER, Status.ACTIVE, true);
+
+		this.router = new RouterNode<>(this);
 		futures.add(pool.submit(router));
 	}
 
-	@SuppressWarnings("unchecked")
-	public <TMessage> void addRootActor(ActorNode<TMessage> node) {
-		router.addRootActor(node.getTopic(), (ActorNode<Object>) node);
+	public <T> void addRootActor(Actor<T> node) {
+		router.addRootActor(node.getTopic(), node);
 	}
 
-	public <TMessage> void executeNode(ActorNode<TMessage> node) {
-		futures.add(pool.submit(node));
+	public <T> void executeNode(Actor<T> node) {
+		if (node.getCb().getStatus().equals(Status.ACTIVE))
+			futures.add(pool.submit(node));
+		else
+			System.err.println("Actor cannot be executed because it's status is not Active!!");
 	}
 
-	public void terminate() throws InterruptedException {
-		Thread.sleep(5000);
+	public boolean terminate() {
+		try {
+			Thread.sleep(1000);
+			terminateRouter();
+			terminateThreadPool();
+			return true;
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	private void terminateThreadPool() throws InterruptedException {
 		pool.shutdown();
+		try {
+			pool.awaitTermination(2, TimeUnit.SECONDS);
+		} finally {
+			if (!pool.isTerminated())
+				pool.shutdownNow();
+		}
+
+	}
+
+	private void terminateRouter() {
+		router.terminate();
 	}
 }
