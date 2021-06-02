@@ -18,7 +18,7 @@ import philosophers.arge.actor.ControlBlock.Status;
 
 @Data
 @Accessors(chain = true)
-public final class RouterNode<TMessage extends RouterMessage<?>> implements Callable<Object> {
+public final class RouterNode<T> implements Terminable, Callable<Boolean> {
 
 	@Getter(value = AccessLevel.PRIVATE)
 	@Setter(value = AccessLevel.PRIVATE)
@@ -32,11 +32,11 @@ public final class RouterNode<TMessage extends RouterMessage<?>> implements Call
 
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
-	private List<TMessage> queue;
+	private List<RouterMessage<T>> queue;
 
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
-	private Map<String, ActorNode<Object>> rootActors;
+	private Map<String, Actor<? extends Object>> rootActors;
 
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
@@ -45,28 +45,33 @@ public final class RouterNode<TMessage extends RouterMessage<?>> implements Call
 
 	public RouterNode(ActorCluster cluster) {
 		lock = new ReentrantLock();
-		cb = new ControlBlock(Type.ROUTER);
+		cb = new ControlBlock(ActorType.ROUTER, Status.ACTIVE, true);
 		getCb().setStatus(Status.ACTIVE);
 		getCb().setIsRoot(true);
 		queueSize = 0;
 		queue = new LinkedList<>();
-		rootActors = new HashMap<String, ActorNode<Object>>();
+		rootActors = new HashMap<>();
 		this.cluster = cluster;
 	}
 
-	public final void addRootActor(String topic, ActorNode<Object> node) {
+	public final <A> void addRootActor(String topic, Actor<A> node) {
 		if (rootActors.containsKey(topic))
 			throw new RuntimeException("This topic is already occupied!!");
 		rootActors.put(topic, node);
-		if (node.getQueueSize() > 0)
+		node.getCb().setStatus(Status.PASSIVE);
+		if (node.getQueueSize() > 0) {
+			node.getCb().setStatus(Status.ACTIVE);
 			cluster.executeNode(node);
+		}
+
 	}
 
-	public final ActorNode<Object> getRootActor(String topic) {
+	@SuppressWarnings("rawtypes")
+	public final Actor getRootActor(String topic) {
 		return rootActors.containsKey(topic) ? rootActors.get(topic) : null;
 	}
 
-	public final void send(TMessage routerMessage) {
+	public final void send(RouterMessage<T> routerMessage) {
 		lock.lock();
 		try {
 			queue.add(routerMessage);
@@ -76,7 +81,7 @@ public final class RouterNode<TMessage extends RouterMessage<?>> implements Call
 		}
 	}
 
-	public final void sendAll(List<TMessage> messageList) {
+	public final void sendAll(List<RouterMessage<T>> messageList) {
 		lock.lock();
 		try {
 			messageList.stream().forEach(x -> {
@@ -89,32 +94,56 @@ public final class RouterNode<TMessage extends RouterMessage<?>> implements Call
 
 	}
 
-	public final TMessage deq() {
-		lock.lock();
-		try {
-			if (queueSize == 0)
-				return null;
-			queueSize--;
-			return queue.remove(0);
-		} finally {
-			lock.unlock();
-		}
+	private final RouterMessage<T> deq() {
+		if (queueSize == 0)
+			return null;
+		queueSize--;
+		return queue.remove(0);
 
 	}
 
 	@SuppressWarnings("unchecked")
-	@Override
-	public Object call() throws Exception {
-		while (Status.ACTIVE.equals(cb.getStatus())) {
+	public void execute() {
+		while (Status.ACTIVE.equals(getCb().getStatus())) {
 			if (queueSize > 0) {
-				TMessage msg = deq();
+				RouterMessage<?> msg = deq();
 				if (msg.getMessage() instanceof ActorNode) {
-					cluster.executeNode((ActorNode<TMessage>) msg.getMessage());
+					cluster.executeNode((ActorNode<?>) msg.getMessage());
 				} else if (msg instanceof RouterMessage) {
-					getRootActor(msg.getTopic()).send(new ActorMessage<>().setMessage(msg.getMessage()));
+					getRootActor(msg.getTopic()).send(new ActorMessage<Object>().setMessage(msg.getMessage()));
 				}
 			}
+			try {
+				// sleep 5ms before next iteration.
+				Thread.sleep(5);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
 		}
-		return null;
+		System.out.println("Router Terminated!!");
+	}
+
+	@Override
+	public boolean terminate() {
+		// save queue if neccessary!!
+		try {
+			getCb().setStatus(Status.PASSIVE);
+			queue.clear();
+			queueSize = 0;
+			for (String key : rootActors.keySet()) {
+				rootActors.get(key).terminate();
+			}
+			rootActors.clear();
+			cluster = null;
+			return true;
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	@Override
+	public Boolean call() throws Exception {
+		execute();
+		return true;
 	}
 }

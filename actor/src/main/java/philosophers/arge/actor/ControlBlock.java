@@ -2,7 +2,9 @@ package philosophers.arge.actor;
 
 import java.util.UUID;
 
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 import lombok.experimental.Accessors;
 
 @Data
@@ -12,15 +14,17 @@ public class ControlBlock {
 		ACTIVE, PASSIVE
 	}
 
+	@Setter(value = AccessLevel.PRIVATE)
 	private String id;
+
 	private Status status;
 	private Boolean isRoot;
-	private Type type;
+	private ActorType type;
 
-	public ControlBlock(Type type) {
-		id = UUID.randomUUID().toString();
-		status = Status.PASSIVE;
+	public ControlBlock(ActorType type, Status status, boolean isRoot) {
+		this.id = UUID.randomUUID().toString();
+		this.status = status;
 		this.type = type;
-		isRoot = true;
+		this.isRoot = isRoot;
 	}
 }
