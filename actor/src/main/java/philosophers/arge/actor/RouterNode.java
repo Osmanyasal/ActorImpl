@@ -18,7 +18,7 @@ import philosophers.arge.actor.ControlBlock.Status;
 
 @Data
 @Accessors(chain = true)
-public final class RouterNode<T> implements Terminable, Callable<Boolean> {
+public final class RouterNode<T extends Object> implements Terminable, Callable<Boolean> {
 
 	@Getter(value = AccessLevel.PRIVATE)
 	@Setter(value = AccessLevel.PRIVATE)
@@ -84,14 +84,13 @@ public final class RouterNode<T> implements Terminable, Callable<Boolean> {
 	public final void sendAll(List<RouterMessage<T>> messageList) {
 		lock.lock();
 		try {
-			messageList.stream().forEach(x -> {
-				queue.add(x);
+			messageList.stream().forEach(m -> {
+				queue.add(m);
 				queueSize++;
 			});
 		} finally {
 			lock.unlock();
 		}
-
 	}
 
 	private final RouterMessage<T> deq() {
@@ -99,7 +98,6 @@ public final class RouterNode<T> implements Terminable, Callable<Boolean> {
 			return null;
 		queueSize--;
 		return queue.remove(0);
-
 	}
 
 	@SuppressWarnings("unchecked")
@@ -107,10 +105,13 @@ public final class RouterNode<T> implements Terminable, Callable<Boolean> {
 		while (Status.ACTIVE.equals(getCb().getStatus())) {
 			if (queueSize > 0) {
 				RouterMessage<?> msg = deq();
-				if (msg.getMessage() instanceof ActorNode) {
-					cluster.executeNode((ActorNode<?>) msg.getMessage());
+				// execute node.
+				if (msg.getMessage() instanceof Actor<?>) {
+					cluster.executeNode((Actor<?>) msg.getMessage());
 				} else if (msg instanceof RouterMessage) {
 					getRootActor(msg.getTopic()).send(new ActorMessage<Object>().setMessage(msg.getMessage()));
+				} else {
+					System.out.println("default message : " + msg.getMessage());
 				}
 			}
 			try {

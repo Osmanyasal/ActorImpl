@@ -8,6 +8,8 @@ import lombok.AccessLevel;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Setter;
+import lombok.ToString;
+import lombok.ToString.Exclude;
 import lombok.experimental.Accessors;
 import philosophers.arge.actor.ControlBlock.Status;
 
@@ -28,6 +30,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage> implements 
 	@Setter(value = AccessLevel.PRIVATE)
 	private long queueSize;
 
+	@Exclude
 	@Setter(value = AccessLevel.PRIVATE)
 	private RouterNode<Object> router;
 
@@ -37,6 +40,9 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage> implements 
 	@Setter(value = AccessLevel.PRIVATE)
 	private Actor<TMessage> childActor;
 
+	@Setter(value = AccessLevel.PRIVATE)
+	private Integer priority;
+
 	/**
 	 * Every actor object must have a topic which defines the job they do. And every
 	 * actor must have a pointer to a router. by default we use the ActorCluster's
@@ -44,14 +50,15 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage> implements 
 	 * 
 	 * @param topic
 	 * @param router
+	 * @param priority must be between 1 to 10
 	 */
-	protected Actor(String topic, RouterNode<Object> router) {
+	protected Actor(String topic, RouterNode<Object> router, Integer priority) {
 		this.router = router;
 		this.topic = topic;
-
-		this.cb = new ControlBlock(ActorType.WORKER, Status.PASSIVE, false);
+		this.cb = new ControlBlock(ActorType.WORKER, Status.PASSIVE, true);
 		this.queue = new LinkedList<>();
 		this.queueSize = 0;
+		this.priority = priority == null ? Thread.NORM_PRIORITY : priority;
 	}
 
 	/**
@@ -79,18 +86,17 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage> implements 
 	}
 
 	/**
-	 * when the node receives a message notifies the router to check it out via this
-	 * method.
-	 * 
-	 * if the node is passive router is going to send the note to the pool for
-	 * execution else it's just going to ignore notification.
+	 * Notify router for execution only if it's not currently executed!
 	 */
 	private void notifyRouter() {
-		if (getCb().getStatus().equals(Status.ACTIVE))
-			router.send(new RouterMessage<Object>().setMessage(this));
+		if (getCb().getStatus().equals(Status.PASSIVE)) {
+			System.out.println("notify router " + getCb().getId().substring(0, 6));
+			router.send(new RouterMessage<Object>().setTopic(getTopic()).setMessage(this));
+		}
 	}
 
 	/**
+	 * 
 	 * Returns an message object from queue if exists or else returns and empty
 	 * message obj.
 	 * 
@@ -110,8 +116,12 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage> implements 
 	 * @return {@code Actor}
 	 */
 	public final Actor<TMessage> generateActor() {
+		if (childActor != null)
+			return childActor;
+
 		Actor<TMessage> node = new ActorNode<>(getTopic(), getRouter());
 		node.getCb().setIsRoot(false);
+		node.getCb().setStatus(Status.PASSIVE);
 		childActor = node;
 		return node;
 	}
@@ -144,6 +154,8 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage> implements 
 	@Override
 	public Object call() throws Exception {
 		operate();
+		// set status passive after execution!!
+		getCb().setStatus(Status.PASSIVE);
 		return true;
 	}
 
