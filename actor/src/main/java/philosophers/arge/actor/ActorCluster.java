@@ -39,7 +39,10 @@ public class ActorCluster implements Terminable {
 	}
 
 	public int getRemainingJobs(String topic) {
-		return futures.containsKey(topic) ? futures.get(topic).size() : 0;
+		synchronized (futures) {
+			return (int) (futures.containsKey(topic) ? futures.get(topic).stream().filter(x -> !x.isDone()).count()
+					: 0);
+		}
 	}
 
 	public <T> void addRootActor(Actor<T> node) {
@@ -52,7 +55,6 @@ public class ActorCluster implements Terminable {
 	}
 
 	public <T> void executeNode(Actor<T> node) {
-		System.out.println("execute node --> " + node.getCb().getId().substring(0, 6));
 		if (node.getCb().getStatus().equals(Status.PASSIVE)) {
 			node.getCb().setStatus(Status.ACTIVE);
 			if (futures.containsKey(node.getTopic()))

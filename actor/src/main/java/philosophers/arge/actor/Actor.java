@@ -43,6 +43,8 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage> implements 
 	@Setter(value = AccessLevel.PRIVATE)
 	private Integer priority;
 
+	private boolean _isNotified;
+
 	/**
 	 * Every actor object must have a topic which defines the job they do. And every
 	 * actor must have a pointer to a router. by default we use the ActorCluster's
@@ -59,6 +61,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage> implements 
 		this.queue = new LinkedList<>();
 		this.queueSize = 0;
 		this.priority = priority == null ? Thread.NORM_PRIORITY : priority;
+		this._isNotified = false;
 	}
 
 	/**
@@ -89,9 +92,10 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage> implements 
 	 * Notify router for execution only if it's not currently executed!
 	 */
 	private void notifyRouter() {
-		if (getCb().getStatus().equals(Status.PASSIVE)) {
+		if (!this._isNotified && getCb().getStatus().equals(Status.PASSIVE)) {
 			System.out.println("notify router " + getCb().getId().substring(0, 6));
 			router.send(new RouterMessage<Object>().setTopic(getTopic()).setMessage(this));
+			this._isNotified = true;
 		}
 	}
 
@@ -156,6 +160,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage> implements 
 		operate();
 		// set status passive after execution!!
 		getCb().setStatus(Status.PASSIVE);
+		this._isNotified = false;
 		return true;
 	}
 
