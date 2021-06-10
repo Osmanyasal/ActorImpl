@@ -10,12 +10,19 @@ import lombok.experimental.Accessors;
 @Accessors(chain = true)
 @AllArgsConstructor
 public class ClusterConfig {
+	public enum TerminationTime {
+		WHEN_EXECUTION_FINISHED, ON_DEMAND, NEVER,
+	}
+
 	private String name;
 	private int threadCount;
+	private TerminationTime terminationTime;
 
 	public ClusterConfig() {
 		name = UUID.randomUUID().toString();
 		threadCount = Runtime.getRuntime().availableProcessors();
-		System.out.println((String.format("clusterName :%s + threadCount : %s", name, threadCount)));
+		terminationTime = TerminationTime.NEVER;
+
+		System.out.println(this.toString());
 	}
 }

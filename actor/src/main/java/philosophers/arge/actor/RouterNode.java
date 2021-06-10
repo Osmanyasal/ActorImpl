@@ -14,6 +14,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString.Exclude;
 import lombok.experimental.Accessors;
+import philosophers.arge.actor.ClusterConfig.TerminationTime;
 import philosophers.arge.actor.ControlBlock.Status;
 
 @Data
@@ -43,6 +44,11 @@ public final class RouterNode<T extends Object> implements Terminable, Callable<
 	@Exclude
 	private ActorCluster cluster;
 
+	@Setter(value = AccessLevel.PRIVATE)
+	@Getter(value = AccessLevel.PRIVATE)
+	@Exclude
+	private TerminationTime terminationTime;
+
 	public RouterNode(ActorCluster cluster) {
 		lock = new ReentrantLock();
 		cb = new ControlBlock(ActorType.ROUTER, Status.ACTIVE, true);
@@ -52,6 +58,7 @@ public final class RouterNode<T extends Object> implements Terminable, Callable<
 		queue = new LinkedList<>();
 		rootActors = new HashMap<>();
 		this.cluster = cluster;
+		terminationTime = cluster.getTerminationTime();
 	}
 
 	public final <A> void addRootActor(String topic, Actor<A> node) {

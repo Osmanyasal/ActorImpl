@@ -8,7 +8,6 @@ import lombok.AccessLevel;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Setter;
-import lombok.ToString;
 import lombok.ToString.Exclude;
 import lombok.experimental.Accessors;
 import philosophers.arge.actor.ControlBlock.Status;
@@ -93,7 +92,6 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage> implements 
 	 */
 	private void notifyRouter() {
 		if (!this._isNotified && getCb().getStatus().equals(Status.PASSIVE)) {
-			System.out.println("notify router " + getCb().getId().substring(0, 6));
 			router.send(new RouterMessage<Object>().setTopic(getTopic()).setMessage(this));
 			this._isNotified = true;
 		}
@@ -140,10 +138,10 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage> implements 
 			getCb().setStatus(Status.PASSIVE);
 			queue.clear();
 			queueSize = 0;
-			router = null;
+			// router = null;
 			if (childActor != null) {
 				childActor.terminate();
-				childActor = null;
+				// childActor = null;
 			}
 			return true;
 		} catch (Exception e) {
@@ -157,7 +155,11 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage> implements 
 	 */
 	@Override
 	public Object call() throws Exception {
-		operate();
+		try {
+			operate();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 		// set status passive after execution!!
 		getCb().setStatus(Status.PASSIVE);
 		this._isNotified = false;
