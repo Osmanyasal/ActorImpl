@@ -1,46 +1,76 @@
 package philosophers.arge.actor;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
 public class Main {
 	public static void main(String[] args) throws Exception {
 
-		ExecutorService pool = Executors.newFixedThreadPool(1);
-		ActorNode<String> node1 = new ActorNode<>("typing", null, null, new NumberBasedDivison<>(3l));
-		node1.send(new ActorMessage<String>().setMessage("1-this is root"));
-		node1.send(new ActorMessage<String>().setMessage("2-this is root"));
-		node1.send(new ActorMessage<String>().setMessage("3-this is root"));
-		node1.send(new ActorMessage<String>().setMessage("4-this is root"));
-		node1.send(new ActorMessage<String>().setMessage("5-this is root"));
-		node1.send(new ActorMessage<String>().setMessage("6-this is root"));
+		final int LIMIT = 50_000;
 
-		pool.submit(node1);
-		pool.submit(node1.fetchChildActor());
-		pool.shutdown();
+		serialExecution(LIMIT);
+
+		System.out.println("====");
+
+		clusterExecution(LIMIT);
+
+	}
+
+	private static void serialExecution(final int LIMIT) throws InterruptedException {
+		System.out.println("Serial Execution : ");
+		long start = System.currentTimeMillis();
+		for (int i = 0; i < LIMIT; i++) {
+			Thread.sleep(10);
+		}
+		long end = System.currentTimeMillis();
+		System.out.println("timer : " + (end - start));
+	}
+
+	private static void clusterExecution(final int LIMIT) throws InterruptedException {
+		System.out.println("Cluster Execution : ");
+
+		// init cluster
+		ActorCluster cluster = new ActorCluster(new ClusterConfig());
+		ActorNode<String> node1 = new ActorNode<>("typing", cluster.getRouter(), null,
+				new NumberBasedDivison<>(1_000l));
+		cluster.addRootActor(node1);
+
+		// load data
+		for (int i = 0; i < LIMIT; i++)
+			node1.load(new ActorMessage<String>().setMessage("" + i));
+
+		// execution
+		long start = System.currentTimeMillis();
+		node1.sendExecutionRequest();
+		cluster.waitTermination();
+		long end = System.currentTimeMillis();
+
+		System.out.println("timer : " + (end - start));
+		cluster.getPool().shutdown();
 	}
 }
 
-class ActorNode<TMessage> extends Actor<TMessage> {
-	private DivisionStrategy<TMessage> strategy;
+class ActorNode<T> extends Actor<T> {
+	private DivisionStrategy<T> strategy;
 
-	protected ActorNode(String topic, RouterNode<Object> router, ActorPriority priority,
-			DivisionStrategy<TMessage> strategy) {
+	protected ActorNode(String topic, RouterNode router, ActorPriority priority, DivisionStrategy<T> strategy) {
 		super(topic, router, priority, strategy);
 		this.strategy = strategy;
 	}
 
 	@Override
 	public void operate() {
-		while (getQueue().size() > 0)
-			System.out.println(deq().getMessage());
+		while (!getQueue().isEmpty()) {
+			try {
+				deq();
+				Thread.sleep(10);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
 
 	}
 
 	@Override
-	public Actor<TMessage> generateChildActor() {
-		System.out.println("child actor generated!");
-		return new ActorNode<TMessage>(getTopic(), getRouter(), getPriority(), strategy);
+	public Actor<T> generateChildActor() {
+		return new ActorNode<T>(getTopic(), getRouter(), getPriority(), strategy);
 	}
 
 }

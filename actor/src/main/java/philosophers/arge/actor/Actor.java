@@ -50,7 +50,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
-	private Lock lock;
+	private Lock queueLock;
 
 	private DivisionStrategy<TMessage> divisionStrategy;
 
@@ -71,7 +71,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 		this.queue = new LinkedList<>();
 		this.priority = priority == null ? ActorPriority.LOW : priority;
 		this.isNotified = false;
-		this.lock = new ReentrantLock();
+		this.queueLock = new ReentrantLock();
 		this.divisionStrategy = divisionStrategy;
 	}
 
@@ -81,14 +81,13 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * 
 	 * @param message
 	 */
-	public final void send(ActorMessage<TMessage> message) {
+	public final void load(ActorMessage<TMessage> message) {
+
 		if (divisionStrategy.isConditionValid(this)) {
 			divisionStrategy.executeStrategy(this, Arrays.asList(message));
 		} else {
 			queue.add(message);
-			sendExecutionRequest();
 		}
-
 	}
 
 	/**
@@ -97,7 +96,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * 
 	 * @param messageList
 	 */
-	public final void sendAll(List<ActorMessage<TMessage>> messageList) {
+	public final void loadAll(List<ActorMessage<TMessage>> messageList) {
 
 		if (divisionStrategy.isConditionValid(this)) {
 			divisionStrategy.executeStrategy(this, messageList);
@@ -105,7 +104,6 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 			messageList.stream().forEach(x -> {
 				queue.add(x);
 			});
-			sendExecutionRequest();
 		}
 
 	}
@@ -117,12 +115,16 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * @param message
 	 */
 	public final void sendByLocking(ActorMessage<TMessage> message) {
-		lock.lock();
+		queueLock.lock();
 		try {
-			queue.add(message);
-			sendExecutionRequest();
+			if (divisionStrategy.isConditionValid(this)) {
+				divisionStrategy.executeStrategy(this, Arrays.asList(message));
+			} else {
+				queue.add(message);
+				sendExecutionRequest();
+			}
 		} finally {
-			lock.unlock();
+			queueLock.unlock();
 		}
 	}
 
@@ -133,23 +135,28 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * @param messageList
 	 */
 	public final void sendAllByLocking(List<ActorMessage<TMessage>> messageList) {
-		lock.lock();
+		queueLock.lock();
 		try {
-			messageList.stream().forEach(x -> {
-				queue.add(x);
-			});
-			sendExecutionRequest();
+			if (divisionStrategy.isConditionValid(this)) {
+				divisionStrategy.executeStrategy(this, messageList);
+			} else {
+				messageList.stream().forEach(x -> {
+					queue.add(x);
+				});
+				sendExecutionRequest();
+			}
+
 		} finally {
-			lock.unlock();
+			queueLock.unlock();
 		}
 	}
 
 	/**
 	 * Notify cluster for execution only if it's not currently executed!
 	 */
-	private void sendExecutionRequest() {
+	public void sendExecutionRequest() {
 		if (!this.isNotified && getCb().getStatus().equals(Status.PASSIVE)) {
-			// TODO: send execution request to the cluster!!
+			getRouter().getCluster().executeNode(this);
 			this.isNotified = true;
 		}
 	}
@@ -162,9 +169,15 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * @return
 	 */
 	public final ActorMessage<TMessage> deq() {
-		if (getQueue().size() == 0)
-			return new ActorMessage<>();
-		return queue.remove(0);
+		queueLock.lock();
+		try {
+			if (getQueue().size() == 0)
+				return new ActorMessage<>();
+			return queue.remove(0);
+		} finally {
+			queueLock.unlock();
+		}
+
 	}
 
 	// oop violation can't use actorNode!!!
@@ -174,7 +187,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * @return {@code Actor}
 	 */
 	private final Actor<TMessage> initChildActor(Actor<TMessage> node) {
-		System.out.println("child actor initiated!");
+		getRouter().getActorCount().put(node.getTopic(), getRouter().getActorCount().get(node.getTopic()) + 1);
 		node.getCb().setIsRoot(false);
 		node.getCb().setStatus(Status.PASSIVE);
 		childActor = node;

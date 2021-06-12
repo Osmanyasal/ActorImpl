@@ -2,6 +2,7 @@ package philosophers.arge.actor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,28 +35,28 @@ public class ActorCluster implements Terminable<Object> {
 		init();
 	}
 
-	private void init() {
+	private final void init() {
 		this.cb = new ControlBlock(ActorType.CLUSTER, Status.ACTIVE, true);
 		this.futures = new HashMap<>();
 		this.lock = new ReentrantLock();
 		router = new RouterNode(this);
 	}
 
-	private void adjustConfigurations(ClusterConfig config) {
+	private final void adjustConfigurations(ClusterConfig config) {
 		this.name = config.getName();
 		this.pool = Executors.newFixedThreadPool(config.getThreadCount());
 		this.terminationTime = config.getTerminationTime();
 	}
 
-	public int getActiveNodeCount(String topic) {
+	public final int getActiveNodeCount(String topic) {
 		return 0;
 	}
 
-	public int getActiveNodeCount() {
+	public final int getActiveNodeCount() {
 		return 0;
 	}
 
-	public void removeFuture(String topicName) {
+	public final void removeFuture(String topicName) {
 		lock.lock();
 		try {
 
@@ -66,7 +67,7 @@ public class ActorCluster implements Terminable<Object> {
 		}
 	}
 
-	public <T> void executeNode(Actor<T> node) {
+	public final void executeNode(Actor<?> node) {
 		if (node.getCb().getStatus().equals(Status.PASSIVE)) {
 			node.getCb().setStatus(Status.ACTIVE);
 			lock.lock();
@@ -98,11 +99,23 @@ public class ActorCluster implements Terminable<Object> {
 		return Arrays.asList(0);
 	}
 
-	public void waitTermination() throws InterruptedException {
+	public final void waitTermination() throws InterruptedException {
+		Collection<List<Future<?>>> values = getFutures().values();
+		while (!values.parallelStream().allMatch(x -> x.stream().allMatch(m -> m.isDone())))
+			Thread.sleep(7);
 
+		System.out.println("All tasks are done!");
 	}
 
-	public <T> void addRootActor(Actor<T> node) {
+	public final void waitTermination(String topic) throws InterruptedException {
+		List<Future<?>> list = getFutures().get(topic);
+		while (!list.parallelStream().allMatch(x -> x.isDone()))
+			Thread.sleep(7);
+
+		System.out.println(topic + " tasks are done!");
+	}
+
+	public final <T> void addRootActor(Actor<T> node) {
 		router.addRootActor(node.getTopic(), node);
 	}
 

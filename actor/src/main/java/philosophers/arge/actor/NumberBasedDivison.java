@@ -30,7 +30,7 @@ public final class NumberBasedDivison<TMessage> implements DivisionStrategy<TMes
 
 	@Override
 	public void executeStrategy(Actor<TMessage> actor, List<ActorMessage<TMessage>> message) {
-		actor.fetchChildActor().sendAll(message);
+		actor.fetchChildActor().sendAllByLocking(message);
 	}
 
 }

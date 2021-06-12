@@ -31,6 +31,9 @@ public final class RouterNode implements Terminable<Object> {
 	private Map<String, Actor<?>> rootActors;
 
 	@Setter(value = AccessLevel.PRIVATE)
+	private Map<String, Integer> actorCount;
+
+	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
 	private Map<String, Actor<?>> remoteRootActors;
 
@@ -43,6 +46,8 @@ public final class RouterNode implements Terminable<Object> {
 		this.lock = new ReentrantLock();
 		this.cb = new ControlBlock(ActorType.ROUTER, Status.ACTIVE, true);
 		this.rootActors = new HashMap<>();
+		this.remoteRootActors = new HashMap<>();
+		this.actorCount = new HashMap<>();
 	}
 
 	public final void addRootActor(String topic, Actor<?> node) {
@@ -50,6 +55,7 @@ public final class RouterNode implements Terminable<Object> {
 		if (rootActors.containsKey(topic))
 			throw new RuntimeException("This topic is already occupied!!");
 
+		actorCount.put(topic, 1);
 		rootActors.put(topic, node);
 		node.getCb().setStatus(Status.PASSIVE);
 	}
