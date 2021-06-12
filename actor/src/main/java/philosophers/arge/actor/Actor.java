@@ -33,7 +33,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 
 	@Exclude
 	@Setter(value = AccessLevel.PRIVATE)
-	private RouterNode<Object> router;
+	private RouterNode router;
 
 	/**
 	 * Every actor might have only one child actor.
@@ -63,7 +63,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * @param router
 	 * @param priority can be omitted.(appoint to Low, by default)
 	 */
-	protected Actor(String topic, RouterNode<Object> router, ActorPriority priority,
+	protected Actor(String topic, RouterNode router, ActorPriority priority,
 			DivisionStrategy<TMessage> divisionStrategy) {
 		this.topic = topic;
 		this.router = router;
@@ -149,8 +149,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 */
 	private void sendExecutionRequest() {
 		if (!this.isNotified && getCb().getStatus().equals(Status.PASSIVE)) {
-			// get cluster address!!
-			// notify cluster!
+			// TODO: send execution request to the cluster!!
 			this.isNotified = true;
 		}
 	}

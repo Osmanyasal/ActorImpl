@@ -20,14 +20,14 @@ import philosophers.arge.actor.ControlBlock.Status;
 @Data
 @Accessors(chain = true)
 public class ActorCluster implements Terminable<Object> {
-	private Lock lock;
 	private String name;
-	private RouterNode<Object> router;
+	private ControlBlock cb;
+	private RouterNode router;
 	private Object gateway;
 	private ExecutorService pool;
 	private Map<String, List<Future<?>>> futures;
-	private ControlBlock cb;
 	private TerminationTime terminationTime;
+	private Lock lock;
 
 	public ActorCluster(ClusterConfig config) {
 		adjustConfigurations(config);
@@ -38,9 +38,7 @@ public class ActorCluster implements Terminable<Object> {
 		this.cb = new ControlBlock(ActorType.CLUSTER, Status.ACTIVE, true);
 		this.futures = new HashMap<>();
 		this.lock = new ReentrantLock();
-		router = new RouterNode<Object>(this);
-		futures.put(ActorType.ROUTER.name(), new ArrayList<>());
-		futures.get(ActorType.ROUTER.name()).add(pool.submit(router));
+		router = new RouterNode(this);
 	}
 
 	private void adjustConfigurations(ClusterConfig config) {
@@ -50,27 +48,11 @@ public class ActorCluster implements Terminable<Object> {
 	}
 
 	public int getActiveNodeCount(String topic) {
-		lock.lock();
-		try {
-			return (int) (futures.containsKey(topic)
-					? getRouter().getQueueSize() + futures.get(topic).stream().filter(x -> !x.isDone()).count() - 1
-					: 0);
-		} finally {
-			lock.unlock();
-		}
+		return 0;
 	}
 
 	public int getActiveNodeCount() {
-		lock.lock();
-		try {
-			int count = (int) getRouter().getQueueSize();
-			for (List<Future<?>> tList : futures.values()) {
-				count += tList.stream().filter(x -> !x.isDone()).count();
-			}
-			return count - 1;
-		} finally {
-			lock.unlock();
-		}
+		return 0;
 	}
 
 	public void removeFuture(String topicName) {

@@ -11,7 +11,7 @@ import lombok.experimental.Accessors;
 @AllArgsConstructor
 public class ClusterConfig {
 	public enum TerminationTime {
-		WHEN_EXECUTION_FINISHED, ON_DEMAND, NEVER,
+		WHEN_EXECUTION_IS_FINISHED, ON_DEMAND, NEVER,
 	}
 
 	private String name;
