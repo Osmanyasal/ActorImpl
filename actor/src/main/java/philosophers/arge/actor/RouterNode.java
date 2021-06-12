@@ -1,5 +1,6 @@
 package philosophers.arge.actor;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -19,7 +20,7 @@ import philosophers.arge.actor.ControlBlock.Status;
 
 @Data
 @Accessors(chain = true)
-public final class RouterNode<T extends Object> implements Terminable, Callable<Boolean> {
+public final class RouterNode<T extends Object> implements Terminable<Object>, Callable<Boolean> {
 
 	@Getter(value = AccessLevel.PRIVATE)
 	@Setter(value = AccessLevel.PRIVATE)
@@ -66,7 +67,7 @@ public final class RouterNode<T extends Object> implements Terminable, Callable<
 			throw new RuntimeException("This topic is already occupied!!");
 		rootActors.put(topic, node);
 		node.getCb().setStatus(Status.PASSIVE);
-		if (node.getQueueSize() > 0) {
+		if (node.getQueue().size() > 0) {
 			node.getCb().setStatus(Status.ACTIVE);
 			cluster.executeNode(node);
 		}
@@ -132,7 +133,7 @@ public final class RouterNode<T extends Object> implements Terminable, Callable<
 	}
 
 	@Override
-	public boolean terminate() {
+	public List<Object> terminate() {
 		// save queue if neccessary!!
 		try {
 			getCb().setStatus(Status.PASSIVE);
@@ -143,9 +144,9 @@ public final class RouterNode<T extends Object> implements Terminable, Callable<
 			}
 			rootActors.clear();
 			cluster = null;
-			return true;
+			return Arrays.asList(0);
 		} catch (Exception e) {
-			return false;
+			return Arrays.asList(0);
 		}
 	}
 

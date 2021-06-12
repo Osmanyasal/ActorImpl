@@ -1,6 +1,7 @@
 package philosophers.arge.actor;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +19,7 @@ import philosophers.arge.actor.ControlBlock.Status;
 
 @Data
 @Accessors(chain = true)
-public class ActorCluster implements Terminable {
+public class ActorCluster implements Terminable<Object> {
 	private Lock lock;
 	private String name;
 	private RouterNode<Object> router;
@@ -29,8 +30,8 @@ public class ActorCluster implements Terminable {
 	private TerminationTime terminationTime;
 
 	public ActorCluster(ClusterConfig config) {
-		init();
 		adjustConfigurations(config);
+		init();
 	}
 
 	private void init() {
@@ -102,17 +103,17 @@ public class ActorCluster implements Terminable {
 	}
 
 	// TODO: Make Termination process better.
-	public boolean terminate() {
+	public List<Object> terminate() {
+		// do not make it asapp !!
+		terminateRouter();
 		try {
-			// do not make it asapp !!
-			terminateRouter();
 			terminateThreadPool();
-			getCb().setStatus(Status.PASSIVE);
-			System.out.println("cluster terminated!");
-			return true;
-		} catch (Exception e) {
-			return false;
+		} catch (InterruptedException e) {
+			e.printStackTrace();
 		}
+		getCb().setStatus(Status.PASSIVE);
+		System.out.println("cluster terminated!");
+		return Arrays.asList(0);
 	}
 
 	public void waitTermination() throws InterruptedException {

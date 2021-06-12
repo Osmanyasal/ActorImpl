@@ -1,6 +1,7 @@
 package philosophers.arge.actor;
 
-public interface Terminable {
-	boolean terminate();
+import java.util.List;
+
+public interface Terminable<TMessage> {
+	List<TMessage> terminate();
 }
- 
