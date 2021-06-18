@@ -82,7 +82,6 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * @param message
 	 */
 	public final void load(ActorMessage<TMessage> message) {
-
 		if (divisionStrategy.isConditionValid(this)) {
 			divisionStrategy.executeStrategy(this, Arrays.asList(message));
 		} else {
@@ -97,15 +96,16 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * @param messageList
 	 */
 	public final void loadAll(List<ActorMessage<TMessage>> messageList) {
-
 		if (divisionStrategy.isConditionValid(this)) {
 			divisionStrategy.executeStrategy(this, messageList);
 		} else {
 			messageList.stream().forEach(x -> {
-				queue.add(x);
+				if (divisionStrategy.isConditionValid(this)) {
+					divisionStrategy.executeStrategy(this, messageList);
+				} else
+					queue.add(x);
 			});
 		}
-
 	}
 
 	/**
@@ -141,7 +141,10 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 				divisionStrategy.executeStrategy(this, messageList);
 			} else {
 				messageList.stream().forEach(x -> {
-					queue.add(x);
+					if (divisionStrategy.isConditionValid(this)) {
+						divisionStrategy.executeStrategy(this, messageList);
+					} else
+						queue.add(x);
 				});
 				sendExecutionRequest();
 			}

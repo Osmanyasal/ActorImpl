@@ -25,10 +25,11 @@ public class ActorCluster implements Terminable<Object> {
 	private ControlBlock cb;
 	private RouterNode router;
 	private Object gateway;
-	private ExecutorService pool;
 	private Map<String, List<Future<?>>> futures;
 	private TerminationTime terminationTime;
 	private Lock lock;
+
+	private ExecutorService pool;
 
 	public ActorCluster(ClusterConfig config) {
 		adjustConfigurations(config);
@@ -39,7 +40,7 @@ public class ActorCluster implements Terminable<Object> {
 		this.cb = new ControlBlock(ActorType.CLUSTER, Status.ACTIVE, true);
 		this.futures = new HashMap<>();
 		this.lock = new ReentrantLock();
-		router = new RouterNode(this);
+		this.router = new RouterNode(this);
 	}
 
 	private final void adjustConfigurations(ClusterConfig config) {
@@ -85,9 +86,8 @@ public class ActorCluster implements Terminable<Object> {
 		}
 	}
 
-	// TODO: Make Termination process better.
+	// TODO:make this process better
 	public List<Object> terminate() {
-		// do not make it asapp !!
 		terminateRouter();
 		try {
 			terminateThreadPool();
@@ -99,18 +99,18 @@ public class ActorCluster implements Terminable<Object> {
 		return Arrays.asList(0);
 	}
 
-	public final void waitTermination() throws InterruptedException {
+	public final void waitForTermination() throws InterruptedException {
 		Collection<List<Future<?>>> values = getFutures().values();
 		while (!values.parallelStream().allMatch(x -> x.stream().allMatch(m -> m.isDone())))
-			Thread.sleep(7);
+			Thread.sleep(3);
 
 		System.out.println("All tasks are done!");
 	}
 
-	public final void waitTermination(String topic) throws InterruptedException {
+	public final void waitForTermination(String topic) throws InterruptedException {
 		List<Future<?>> list = getFutures().get(topic);
 		while (!list.parallelStream().allMatch(x -> x.isDone()))
-			Thread.sleep(7);
+			Thread.sleep(3);
 
 		System.out.println(topic + " tasks are done!");
 	}
@@ -119,14 +119,16 @@ public class ActorCluster implements Terminable<Object> {
 		router.addRootActor(node.getTopic(), node);
 	}
 
-	private void terminateThreadPool() throws InterruptedException {
+	// TODO:make this private
+	public List<Runnable> terminateThreadPool() throws InterruptedException {
 		pool.shutdown();
 		try {
 			pool.awaitTermination(2, TimeUnit.SECONDS);
 		} finally {
 			if (!pool.isTerminated())
-				pool.shutdownNow();
+				return pool.shutdownNow();
 		}
+		return null;
 	}
 
 	private void terminateRouter() {

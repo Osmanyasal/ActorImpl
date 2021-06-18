@@ -1,56 +1,35 @@
 package philosophers.arge.actor;
 
+import java.util.PriorityQueue;
+
 public class Main {
+
 	public static void main(String[] args) throws Exception {
-
-		final int LIMIT = 50_000;
-
-		serialExecution(LIMIT);
-
-		System.out.println("====");
-
-		clusterExecution(LIMIT);
-
+		clusterExecution();
 	}
 
-	private static void serialExecution(final int LIMIT) throws InterruptedException {
-		System.out.println("Serial Execution : ");
-		long start = System.currentTimeMillis();
-		for (int i = 0; i < LIMIT; i++) {
-			Thread.sleep(10);
-		}
-		long end = System.currentTimeMillis();
-		System.out.println("timer : " + (end - start));
-	}
-
-	private static void clusterExecution(final int LIMIT) throws InterruptedException {
-		System.out.println("Cluster Execution : ");
-
+	private static void clusterExecution() throws InterruptedException {
 		// init cluster
 		ActorCluster cluster = new ActorCluster(new ClusterConfig());
-		ActorNode<String> node1 = new ActorNode<>("typing", cluster.getRouter(), null,
-				new NumberBasedDivison<>(1_000l));
+		FirstNode<String> node1 = new FirstNode<>("first node", cluster.getRouter(), null, new NoDivision<>());
+		SecondNode<String> node2 = new SecondNode<>("second node", cluster.getRouter(), null, new NoDivision<>());
 		cluster.addRootActor(node1);
+		cluster.addRootActor(node2);
 
 		// load data
-		for (int i = 0; i < LIMIT; i++)
-			node1.load(new ActorMessage<String>().setMessage("" + i));
+		for (int i = 0; i < 100; i++)
+			node1.load(new ActorMessage<String>().setMessage("msg[" + i + "]"));
 
-		// execution
-		long start = System.currentTimeMillis();
 		node1.sendExecutionRequest();
-		cluster.waitTermination();
-		long end = System.currentTimeMillis();
-
-		System.out.println("timer : " + (end - start));
-		cluster.getPool().shutdown();
+		cluster.waitForTermination();
+		cluster.terminateThreadPool();
 	}
 }
 
-class ActorNode<T> extends Actor<T> {
+class FirstNode<T> extends Actor<T> {
 	private DivisionStrategy<T> strategy;
 
-	protected ActorNode(String topic, RouterNode router, ActorPriority priority, DivisionStrategy<T> strategy) {
+	protected FirstNode(String topic, RouterNode router, ActorPriority priority, DivisionStrategy<T> strategy) {
 		super(topic, router, priority, strategy);
 		this.strategy = strategy;
 	}
@@ -58,19 +37,39 @@ class ActorNode<T> extends Actor<T> {
 	@Override
 	public void operate() {
 		while (!getQueue().isEmpty()) {
-			try {
-				deq();
-				Thread.sleep(10);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-		}
+			String msg = (String) deq().getMessage();
+			System.out.println("first(" + msg + ")");
 
+			@SuppressWarnings("unchecked")
+			Actor<String> nextActor = (Actor<String>) getRouter().getRootActor("second node");
+			nextActor.sendByLocking(new ActorMessage<String>().setMessage(msg));
+		}
 	}
 
 	@Override
 	public Actor<T> generateChildActor() {
-		return new ActorNode<T>(getTopic(), getRouter(), getPriority(), strategy);
+		return new FirstNode<>(getTopic(), getRouter(), getPriority(), strategy);
+	}
+}
+
+class SecondNode<T> extends Actor<T> {
+	private DivisionStrategy<T> strategy;
+
+	protected SecondNode(String topic, RouterNode router, ActorPriority priority, DivisionStrategy<T> strategy) {
+		super(topic, router, priority, strategy);
+		this.strategy = strategy;
 	}
 
+	@Override
+	public void operate() {
+		while (!getQueue().isEmpty()) {
+			String msg = (String) deq().getMessage();
+			System.out.println("second(" + msg + ")");
+		}
+	}
+
+	@Override
+	public Actor<T> generateChildActor() {
+		return new SecondNode<>(getTopic(), getRouter(), getPriority(), strategy);
+	}
 }

@@ -21,8 +21,7 @@ public class ClusterConfig {
 	public ClusterConfig() {
 		name = UUID.randomUUID().toString();
 		threadCount = Runtime.getRuntime().availableProcessors();
-		terminationTime = TerminationTime.NEVER;
-
+		terminationTime = TerminationTime.ON_DEMAND;
 		System.out.println(this.toString());
 	}
 }
