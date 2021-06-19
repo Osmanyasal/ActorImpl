@@ -32,6 +32,7 @@ public class ActorCluster implements Terminable<Object> {
 	private ExecutorService pool;
 
 	public ActorCluster(ClusterConfig config) {
+		System.out.println(config);
 		adjustConfigurations(config);
 		init();
 	}
@@ -55,6 +56,16 @@ public class ActorCluster implements Terminable<Object> {
 
 	public final int getActiveNodeCount() {
 		return 0;
+	}
+
+	public final int getNodeCount(String topic) {
+		int count = 0;
+		Actor<?> actor = getRouter().getRootActor(topic);
+		while (actor != null) {
+			count++;
+			actor = actor.getChildActor();
+		}
+		return count;
 	}
 
 	public final void removeFuture(String topicName) {
@@ -104,7 +115,7 @@ public class ActorCluster implements Terminable<Object> {
 		while (!values.parallelStream().allMatch(x -> x.stream().allMatch(m -> m.isDone())))
 			Thread.sleep(3);
 
-		System.out.println("All tasks are done!");
+		// System.out.println("All tasks are done!");
 	}
 
 	public final void waitForTermination(String topic) throws InterruptedException {
@@ -112,7 +123,7 @@ public class ActorCluster implements Terminable<Object> {
 		while (!list.parallelStream().allMatch(x -> x.isDone()))
 			Thread.sleep(3);
 
-		System.out.println(topic + " tasks are done!");
+		// System.out.println(topic + " tasks are done!");
 	}
 
 	public final <T> void addRootActor(Actor<T> node) {

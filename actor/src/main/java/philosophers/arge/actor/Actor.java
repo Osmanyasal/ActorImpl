@@ -155,6 +155,25 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	}
 
 	/**
+	 * used for parent -> child message transfer
+	 * 
+	 * @param messageList
+	 */
+	public final void sendAll(List<ActorMessage<TMessage>> messageList) {
+		if (divisionStrategy.isConditionValid(this)) {
+			divisionStrategy.executeStrategy(this, messageList);
+		} else {
+			messageList.stream().forEach(x -> {
+				if (divisionStrategy.isConditionValid(this)) {
+					divisionStrategy.executeStrategy(this, messageList);
+				} else
+					queue.add(x);
+			});
+			sendExecutionRequest();
+		}
+	}
+
+	/**
 	 * Notify cluster for execution only if it's not currently executed!
 	 */
 	public void sendExecutionRequest() {
