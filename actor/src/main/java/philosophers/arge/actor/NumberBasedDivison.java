@@ -10,7 +10,6 @@ import lombok.experimental.Accessors;
 /**
  * In this strategy, if the queue size exceeds our queue limit we create a new
  * child actor and toast messages to it.
- * 
  *
  * @author osmanyasal
  *
@@ -29,8 +28,12 @@ public final class NumberBasedDivison<TMessage> implements DivisionStrategy<TMes
 	}
 
 	@Override
-	public void executeStrategy(Actor<TMessage> actor, List<ActorMessage<TMessage>> message) {
+	public void executeSendingStrategy(Actor<TMessage> actor, List<ActorMessage<TMessage>> message) {
 		actor.fetchChildActor().sendAllByLocking(message);
 	}
 
+	@Override
+	public void executeLoadingStrategy(Actor<TMessage> actor, List<ActorMessage<TMessage>> message) {
+		actor.fetchChildActor().loadAll(message);
+	}
 }

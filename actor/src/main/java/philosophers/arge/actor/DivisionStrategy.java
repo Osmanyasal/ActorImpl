@@ -6,5 +6,7 @@ public interface DivisionStrategy<TMessage> {
 
 	boolean isConditionValid(Actor<TMessage> actor);
 
-	void executeStrategy(Actor<TMessage> actor, List<ActorMessage<TMessage>> message);
+	void executeSendingStrategy(Actor<TMessage> actor, List<ActorMessage<TMessage>> message);
+
+	void executeLoadingStrategy(Actor<TMessage> actor, List<ActorMessage<TMessage>> message);
 }

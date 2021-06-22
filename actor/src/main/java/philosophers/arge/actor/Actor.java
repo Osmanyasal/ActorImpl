@@ -82,9 +82,8 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * @param message
 	 */
 	public final void load(ActorMessage<TMessage> message) {
-
 		if (divisionStrategy.isConditionValid(this)) {
-			divisionStrategy.executeStrategy(this, Arrays.asList(message));
+			divisionStrategy.executeLoadingStrategy(this, Arrays.asList(message));
 		} else {
 			queue.add(message);
 		}
@@ -97,15 +96,16 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * @param messageList
 	 */
 	public final void loadAll(List<ActorMessage<TMessage>> messageList) {
-
 		if (divisionStrategy.isConditionValid(this)) {
-			divisionStrategy.executeStrategy(this, messageList);
+			divisionStrategy.executeLoadingStrategy(this, messageList);
 		} else {
 			messageList.stream().forEach(x -> {
-				queue.add(x);
+				if (divisionStrategy.isConditionValid(this)) {
+					divisionStrategy.executeLoadingStrategy(this, messageList);
+				} else
+					queue.add(x);
 			});
 		}
-
 	}
 
 	/**
@@ -118,7 +118,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 		queueLock.lock();
 		try {
 			if (divisionStrategy.isConditionValid(this)) {
-				divisionStrategy.executeStrategy(this, Arrays.asList(message));
+				divisionStrategy.executeSendingStrategy(this, Arrays.asList(message));
 			} else {
 				queue.add(message);
 				sendExecutionRequest();
@@ -138,10 +138,13 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 		queueLock.lock();
 		try {
 			if (divisionStrategy.isConditionValid(this)) {
-				divisionStrategy.executeStrategy(this, messageList);
+				divisionStrategy.executeSendingStrategy(this, messageList);
 			} else {
 				messageList.stream().forEach(x -> {
-					queue.add(x);
+					if (divisionStrategy.isConditionValid(this)) {
+						divisionStrategy.executeSendingStrategy(this, messageList);
+					} else
+						queue.add(x);
 				});
 				sendExecutionRequest();
 			}
@@ -152,12 +155,42 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	}
 
 	/**
+	 * used for parent -> child message transfer
+	 * 
+	 * @param messageList
+	 */
+	public final void sendAll(List<ActorMessage<TMessage>> messageList) {
+		if (divisionStrategy.isConditionValid(this)) {
+			divisionStrategy.executeSendingStrategy(this, messageList);
+		} else {
+			messageList.stream().forEach(x -> {
+				if (divisionStrategy.isConditionValid(this)) {
+					divisionStrategy.executeSendingStrategy(this, messageList);
+				} else
+					queue.add(x);
+			});
+			sendExecutionRequest();
+		}
+	}
+
+	/**
 	 * Notify cluster for execution only if it's not currently executed!
 	 */
-	public void sendExecutionRequest() {
+	private void sendExecutionRequest() {
 		if (!this.isNotified && getCb().getStatus().equals(Status.PASSIVE)) {
 			getRouter().getCluster().executeNode(this);
 			this.isNotified = true;
+		}
+	}
+
+	/**
+	 * send an execution request for both itself and it's children nodes.
+	 */
+	public void executeNodeStack() {
+		Actor<?> temp = this;
+		while (temp != null) {
+			temp.sendExecutionRequest();
+			temp = temp.getChildActor();
 		}
 	}
 
