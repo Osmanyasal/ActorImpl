@@ -63,16 +63,16 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * @param router
 	 * @param priority can be omitted.(appoint to Low, by default)
 	 */
-	protected Actor(String topic, RouterNode router, ActorPriority priority,
-			DivisionStrategy<TMessage> divisionStrategy) {
-		this.topic = topic;
-		this.router = router;
+
+	protected Actor(ActorConfig<TMessage> config) {
+		this.topic = config.getTopic();
+		this.router = config.getRouter();
 		this.cb = new ControlBlock(ActorType.WORKER, Status.PASSIVE, true);
 		this.queue = new LinkedList<>();
 		this.priority = priority == null ? ActorPriority.LOW : priority;
 		this.isNotified = false;
 		this.queueLock = new ReentrantLock();
-		this.divisionStrategy = divisionStrategy;
+		this.divisionStrategy = config.getDivisionStrategy();
 	}
 
 	/**
@@ -101,7 +101,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 		} else {
 			messageList.stream().forEach(x -> {
 				if (divisionStrategy.isConditionValid(this)) {
-					divisionStrategy.executeLoadingStrategy(this, messageList);
+					divisionStrategy.executeLoadingStrategy(this, Arrays.asList(x));
 				} else
 					queue.add(x);
 			});
@@ -142,7 +142,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 			} else {
 				messageList.stream().forEach(x -> {
 					if (divisionStrategy.isConditionValid(this)) {
-						divisionStrategy.executeSendingStrategy(this, messageList);
+						divisionStrategy.executeSendingStrategy(this, Arrays.asList(x));
 					} else
 						queue.add(x);
 				});
