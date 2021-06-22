@@ -115,7 +115,7 @@ public class ActorCluster implements Terminable<Object> {
 		while (!values.parallelStream().allMatch(x -> x.stream().allMatch(m -> m.isDone())))
 			Thread.sleep(3);
 
-		// System.out.println("All tasks are done!");
+		System.out.println("All tasks are done!");
 	}
 
 	public final void waitForTermination(String topic) throws InterruptedException {
@@ -123,7 +123,7 @@ public class ActorCluster implements Terminable<Object> {
 		while (!list.parallelStream().allMatch(x -> x.isDone()))
 			Thread.sleep(3);
 
-		// System.out.println(topic + " tasks are done!");
+		System.out.println(topic + " tasks are done!");
 	}
 
 	public final <T> void addRootActor(Actor<T> node) {

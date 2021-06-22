@@ -9,8 +9,13 @@ public final class NoDivision<TMessage> implements DivisionStrategy<TMessage> {
 		return false;
 	}
 
+
 	@Override
-	public void executeStrategy(Actor<TMessage> actor, List<ActorMessage<TMessage>> message) {
+	public void executeSendingStrategy(Actor<TMessage> actor, List<ActorMessage<TMessage>> message) {
+	}
+
+	@Override
+	public void executeLoadingStrategy(Actor<TMessage> actor, List<ActorMessage<TMessage>> message) {
 	}
 
 }

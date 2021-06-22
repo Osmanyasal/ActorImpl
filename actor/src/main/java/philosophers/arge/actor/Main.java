@@ -1,23 +1,87 @@
 package philosophers.arge.actor;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 
+@Data
+@Accessors(chain = true)
+class WordCount extends Actor<String> {
+
+	private String word;
+	private long sum = 0;
+
+	protected WordCount(String word, String topic, RouterNode router, ActorPriority priority,
+			DivisionStrategy<String> divisionStrategy) {
+		super(topic, router, priority, divisionStrategy);
+		this.word = word;
+	}
+
+	@Override
+	public void operate() {
+		String temp;
+		while (getQueue().size() > 0) {
+			ActorMessage<String> msg = deq();
+			temp = msg.getMessage();
+			if (temp.equals(word))
+				sum++;
+		}
+	}
+
+	@Override
+	public Actor<String> generateChildActor() {
+		return new WordCount(word, getTopic(), getRouter(), getPriority(), getDivisionStrategy());
+	}
+
+}
+
 public class Main {
 
 	public static void main(String[] args) throws Exception {
-		for (int i = 0; i < 5; i++) {
-			float cx = clusterExecution();
-			System.gc();
-			float sx = serialExecution();
-			System.gc();
+		Random rnd = new Random();
+//		for (int i = 0; i < 5; i++) {
+//			float cx = clusterExecution();
+//			System.gc();
+//			float sx = 1;// serialExecution();
+//			System.gc();
+//
+//			System.out.println(
+//					String.format("Time(Serial) : %s\nTime(Parallel) : %s\nSpeedUp : %sx", sx, cx, (sx / (float) cx)));
+//		}
+		String[] arr = { "osman", "sinem", "hatice", "kerem", "merve", "burcu", "yağmur", "sekiz", "dokuz", "10" };
+		List<String> wordList = new ArrayList<>();
 
-			System.out.println(
-					String.format("Time(Serial) : %s\nTime(Parallel) : %s\nSpeedUp : %sx", sx, cx, (sx / (float) cx)));
+		ActorCluster cluster = new ActorCluster(new ClusterConfig());
+		WordCount wordCount = new WordCount("kerem", "wordCount", cluster.getRouter(), ActorPriority.MEDIUM,
+				new NumberBasedDivison<>(10_000l));
+		cluster.addRootActor(wordCount);
+
+		int temp = 0;
+		String msg = "";
+		for (int i = 0; i < 15_000_000; i++) {
+			msg = arr[rnd.nextInt(10)];
+			wordList.add(msg);
+			wordCount.sendByLocking(new ActorMessage<String>().setMessage(msg));
+			if (msg.equals("kerem"))
+				temp++;
 		}
+		System.out.println("end of loop!!");
+
+		System.out.println("first total  : " + temp);
+		cluster.waitForTermination("wordCount");
+		WordCount acc = wordCount;
+		int temp2 = 0;
+		while (acc != null) {
+			temp2 += acc.getSum();
+			acc = (WordCount) acc.getChildActor();
+		}
+		System.out.println("second total : " + temp2);
+		cluster.terminateThreadPool();
 	}
 
 	private static long serialExecution() throws InterruptedException {
@@ -48,15 +112,14 @@ public class Main {
 				new NumberBasedDivison<>(17l));
 		cluster.addRootActor(decompression);
 
-
 		long first = System.currentTimeMillis();
-		
-		// loading data 
+
+		// loading data
 		for (int i = 0; i < 1_000; i++)
 			decompression.load(new ActorMessage<Image>().setMessage(new Image()));
 
-		decompression.sendExecutionRequest();
-		
+		decompression.executeNodeStack();
+
 		cluster.waitForTermination();
 		long second = System.currentTimeMillis();
 
