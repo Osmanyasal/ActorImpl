@@ -10,6 +10,5 @@ import lombok.experimental.Accessors;
 public class ActorConfig<TMessage> {
 	private String topic;
 	private RouterNode router;
-	private ActorPriority priority;
 	private DivisionStrategy<TMessage> divisionStrategy;
 }

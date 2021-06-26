@@ -1,11 +1,10 @@
 package philosophers.arge.actor;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import lombok.AccessLevel;
 import lombok.Data;
@@ -17,11 +16,11 @@ import philosophers.arge.actor.ControlBlock.Status;
 
 @Data
 @Accessors(chain = true)
-public final class RouterNode implements Terminable<Object> {
+public final class RouterNode implements RouterTerminator {
 
 	@Getter(value = AccessLevel.PRIVATE)
 	@Setter(value = AccessLevel.PRIVATE)
-	private Lock lock;
+	private ReadWriteLock lock;
 
 	@Setter(value = AccessLevel.PRIVATE)
 	private ControlBlock cb;
@@ -31,7 +30,8 @@ public final class RouterNode implements Terminable<Object> {
 	private Map<String, Actor<?>> rootActors;
 
 	@Setter(value = AccessLevel.PRIVATE)
-	private Map<String, Integer> actorCount;
+	@Getter(value = AccessLevel.PRIVATE)
+	private Map<String, Integer> actorCountMap;
 
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
@@ -43,36 +43,49 @@ public final class RouterNode implements Terminable<Object> {
 
 	public RouterNode(ActorCluster cluster) {
 		this.cluster = cluster;
-		this.lock = new ReentrantLock();
+		this.lock = new ReentrantReadWriteLock();
 		this.cb = new ControlBlock(ActorType.ROUTER, Status.ACTIVE, true);
 		this.rootActors = new HashMap<>();
 		this.remoteRootActors = new HashMap<>();
-		this.actorCount = new HashMap<>();
+		this.actorCountMap = new HashMap<>();
 	}
 
 	public final void addRootActor(String topic, Actor<?> node) {
-
 		if (rootActors.containsKey(topic))
 			throw new RuntimeException("This topic is already occupied!!");
-
-		actorCount.put(topic, 1);
-		rootActors.put(topic, node);
-		node.getCb().setStatus(Status.PASSIVE);
+		lock.writeLock().lock();
+		try {
+			this.actorCountMap.put(topic, 1);
+			rootActors.put(topic, node);
+		} finally {
+			lock.writeLock().unlock();
+		}
 	}
 
 	public final Actor<?> getRootActor(String topic) {
-		return rootActors.containsKey(topic) ? rootActors.get(topic) : null;
+		lock.readLock().lock();
+		try {
+			return rootActors.containsKey(topic) ? rootActors.get(topic) : null;
+		} finally {
+			lock.readLock().unlock();
+		}
+	}
+
+	public final void incrementActorCount(String topic) {
+		this.actorCountMap.put(topic, this.actorCountMap.get(topic) + 1);
 	}
 
 	@Override
-	public List<Object> terminate() {
+	public Map<String, List<?>> terminateRouter() {
 		// save queue if neccessary!!
-		getCb().setStatus(Status.PASSIVE);
+		Map<String, List<?>> waitingJobs = new HashMap<>();
+		this.cb.setStatus(Status.PASSIVE);
 		for (String key : rootActors.keySet()) {
-			rootActors.get(key).terminate();
+			waitingJobs.put(key, rootActors.get(key).terminate());
 		}
 		rootActors.clear();
+		actorCountMap.clear();
 		remoteRootActors.clear();
-		return new ArrayList<>();
+		return waitingJobs;
 	}
 }
