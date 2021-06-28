@@ -20,6 +20,7 @@ public final class RouterNode implements RouterTerminator {
 
 	@Getter(value = AccessLevel.PRIVATE)
 	@Setter(value = AccessLevel.PRIVATE)
+	@Exclude
 	private ReadWriteLock lock;
 
 	@Setter(value = AccessLevel.PRIVATE)
@@ -50,6 +51,7 @@ public final class RouterNode implements RouterTerminator {
 		this.actorCountMap = new HashMap<>();
 	}
 
+	@ThreadSafe
 	public final void addRootActor(String topic, Actor<?> node) {
 		if (rootActors.containsKey(topic))
 			throw new RuntimeException("This topic is already occupied!!");

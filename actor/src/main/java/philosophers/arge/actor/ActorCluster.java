@@ -15,11 +15,13 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import lombok.Data;
 import lombok.experimental.Accessors;
+import lombok.experimental.FieldNameConstants;
 import philosophers.arge.actor.ClusterConfig.TerminationTime;
 import philosophers.arge.actor.ControlBlock.Status;
 
 @Data
 @Accessors(chain = true)
+@FieldNameConstants
 public class ActorCluster implements ClusterTerminator {
 	private String name;
 	private ControlBlock cb;
@@ -36,6 +38,7 @@ public class ActorCluster implements ClusterTerminator {
 		init();
 	}
 
+	@Immutable
 	private final void init() {
 		this.cb = new ControlBlock(ActorType.CLUSTER, Status.ACTIVE, true);
 		this.futures = new HashMap<>();
@@ -43,20 +46,27 @@ public class ActorCluster implements ClusterTerminator {
 		this.router = new RouterNode(this);
 	}
 
+	@Immutable
 	private final void adjustConfigurations(ClusterConfig config) {
 		this.name = config.getName();
 		this.pool = Executors.newFixedThreadPool(config.getThreadCount());
 		this.terminationTime = config.getTerminationTime();
 	}
 
+	@Immutable
+	@NotThreadSafe
 	public final int getActiveNodeCount(String topic) {
-		return 0;
+		return router.getRootActor(topic).getActiveNodeCount();
 	}
 
+	@Immutable
+	@NotThreadSafe
 	public final int getActiveNodeCount() {
 		return 0;
 	}
 
+	@Immutable
+	@NotThreadSafe
 	public final int getNodeCount(String topic) {
 		int count = 0;
 		Actor<?> actor = this.router.getRootActor(topic);
@@ -67,6 +77,9 @@ public class ActorCluster implements ClusterTerminator {
 		return count;
 	}
 
+	@Immutable
+	@ThreadSafe
+	@GuardedBy(ActorCluster.Fields.lock)
 	public final void executeNode(Actor<?> node) {
 		if (node.getCb().getStatus().equals(Status.PASSIVE)) {
 			node.getCb().setStatus(Status.ACTIVE);
@@ -85,6 +98,8 @@ public class ActorCluster implements ClusterTerminator {
 		}
 	}
 
+	@Immutable
+	@ThreadSafe
 	public final <T> void addRootActor(Actor<T> node) {
 		router.addRootActor(node.getTopic(), node);
 	}
@@ -125,6 +140,7 @@ public class ActorCluster implements ClusterTerminator {
 		return result;
 	}
 
+	@Immutable
 	// TODO:Bitip bitmediği bilgisi root dugumlerden sorulsun
 	public final void waitForTermination() throws InterruptedException {
 		Collection<List<Future<?>>> values = getFutures().values();
@@ -133,6 +149,7 @@ public class ActorCluster implements ClusterTerminator {
 		System.out.println("All tasks are done!");
 	}
 
+	@Immutable
 	public final void waitForTermination(String topic) throws InterruptedException {
 		List<Future<?>> list = getFutures().get(topic);
 		while (list.parallelStream().anyMatch(x -> !x.isDone()))

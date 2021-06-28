@@ -8,16 +8,15 @@ public class Main {
 	public static void main(String[] args) throws Exception {
 		ActorCluster cluster = new ActorCluster(new ClusterConfig());
 		TempActor actor = new TempActor(
-				new ActorConfig<Integer>("deneme", cluster.getRouter(), new NumberBasedDivison<Integer>(1l)));
+				new ActorConfig<Integer>("deneme", cluster.getRouter(), new NumberBasedDivison(1l)));
 		cluster.addRootActor(actor);
 
 		for (int i = 0; i < 1_500; i++)
-			actor.load(new ActorMessage<Integer>().setMessage(i));
+			actor.load(new ActorMessage<>(i));
 
 		actor.executeNodeStack();
 
-		Map<String, List<?>> remaningItems = cluster.terminateCluster();
-		System.out.println(remaningItems.get("deneme").size());
+		 
 	}
 
 	public static int[][] multiplyMatrix(int[][] a, int[][] b) {

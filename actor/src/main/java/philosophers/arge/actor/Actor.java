@@ -9,7 +9,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import lombok.AccessLevel;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString.Exclude;
@@ -17,15 +16,12 @@ import lombok.experimental.Accessors;
 import philosophers.arge.actor.ControlBlock.Status;
 
 @Data
-@EqualsAndHashCode(callSuper = true)
 @Accessors(chain = true)
-public abstract class Actor<TMessage> extends ActorMessage<TMessage>
-		implements Callable<Object>, ActorTerminator<TMessage> {
+public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminator<TMessage> {
 
 	@Setter(value = AccessLevel.PRIVATE)
 	private String topic;
-
-	@Exclude
+ 
 	@Setter(value = AccessLevel.PRIVATE)
 	private ControlBlock cb;
 
@@ -69,17 +65,31 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 		init();
 	}
 
+	@NotThreadSafe
 	private void adjustConfigurations(ActorConfig<TMessage> config) {
 		this.topic = config.getTopic();
 		this.router = config.getRouter();
 		this.divisionStrategy = config.getDivisionStrategy();
 	}
 
+	@NotThreadSafe
 	private void init() {
 		this.queueLock = new ReentrantLock(true);
 		this.cb = new ControlBlock(ActorType.WORKER, Status.PASSIVE, true);
 		this.queue = new LinkedList<>();
 		this.isNotified = false;
+	}
+
+	@NotThreadSafe
+	public final int getActiveNodeCount() {
+		int result = 0;
+		Actor<?> iter = this;
+		while (iter != null) {
+			if (iter.cb.getStatus().equals(Status.ACTIVE))
+				result++;
+			iter = iter.childActor;
+		}
+		return result;
 	}
 
 	/**
@@ -89,6 +99,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * 
 	 * @param message
 	 */
+	@NotThreadSafe
 	public final void load(ActorMessage<TMessage> message) {
 		if (divisionStrategy.isConditionValid(this)) {
 			divisionStrategy.executeLoadingStrategy(this, Arrays.asList(message));
@@ -104,6 +115,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * 
 	 * @param messageList
 	 */
+	@NotThreadSafe
 	public final void loadAll(List<ActorMessage<TMessage>> messageList) {
 		if (divisionStrategy.isConditionValid(this)) {
 			divisionStrategy.executeLoadingStrategy(this, messageList);
@@ -122,6 +134,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * 
 	 * @param messageList
 	 */
+	@NotThreadSafe
 	public final void sendAll(List<ActorMessage<TMessage>> messageList) {
 		loadAll(messageList);
 		sendExecutionRequest();
@@ -133,6 +146,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * 
 	 * @param message
 	 */
+	@ThreadSafe
 	public final void sendByLocking(ActorMessage<TMessage> message) {
 		queueLock.lock();
 		try {
@@ -153,6 +167,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * 
 	 * @param messageList
 	 */
+	@ThreadSafe
 	public final void sendAllByLocking(List<ActorMessage<TMessage>> messageList) {
 		queueLock.lock();
 		try {
@@ -176,6 +191,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	/**
 	 * Notify cluster for execution only if it's not currently executed!
 	 */
+	@NotThreadSafe
 	private void sendExecutionRequest() {
 		if (!this.isNotified && getCb().getStatus().equals(Status.PASSIVE)) {
 			this.router.getCluster().executeNode(this);
@@ -186,6 +202,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	/**
 	 * send an execution request for both itself and it's children nodes.
 	 */
+	@NotThreadSafe
 	public void executeNodeStack() {
 		Actor<?> temp = this;
 		while (temp != null) {
@@ -201,11 +218,12 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * 
 	 * @return
 	 */
+	@ThreadSafe
 	public final ActorMessage<TMessage> deq() {
 		queueLock.lock();
 		try {
 			if (this.queue.isEmpty())
-				return new ActorMessage<>();
+				return new ActorMessage<>(null);
 			return queue.remove(0);
 		} finally {
 			queueLock.unlock();
@@ -218,6 +236,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * 
 	 * @return {@code Actor}
 	 */
+	@NotThreadSafe
 	private final Actor<TMessage> initChildActor(Actor<TMessage> node) {
 		this.router.incrementActorCount(node.getTopic());
 		node.getCb().setIsRoot(false);
@@ -226,6 +245,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 		return node;
 	}
 
+	@NotThreadSafe
 	public final Actor<TMessage> fetchChildActor() {
 		if (childActor != null)
 			return childActor;
@@ -237,6 +257,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * Returns the waiting queue values and appoint the actor status to passsive!;
 	 * 
 	 */
+	@NotThreadSafe
 	public List<ActorMessage<TMessage>> terminate() {
 		this.cb.setStatus(Status.PASSIVE);
 		if (childActor != null) {
