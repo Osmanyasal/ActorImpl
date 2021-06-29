@@ -6,7 +6,23 @@ import lombok.AccessLevel;
 import lombok.Data;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import philosophers.arge.actor.annotations.NotThreadSafe;
 
+/**
+ * This is a tag of an object as like {@code ProcessControlBlock}. <br>
+ * By using this tag we can get some information of the object.<br>
+ * ex:<br>
+ * <ul>
+ * <li>id</li>
+ * <li>status</li>
+ * <li>isRoot</li>
+ * <li>type</li>
+ * </ul>
+ * 
+ * @author osmanyasal
+ *
+ */
+@NotThreadSafe
 @Data
 @Accessors(chain = true)
 public class ControlBlock {
@@ -17,9 +33,12 @@ public class ControlBlock {
 	@Setter(value = AccessLevel.PRIVATE)
 	private String id;
 
-	private Status status;
-	private Boolean isRoot;
+	@Setter(value = AccessLevel.PRIVATE)
 	private ActorType type;
+
+	private Boolean isRoot;
+
+	private Status status;
 
 	public ControlBlock(ActorType type, Status status, boolean isRoot) {
 		this.id = UUID.randomUUID().toString();

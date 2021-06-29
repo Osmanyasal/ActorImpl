@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import philosophers.arge.actor.annotations.Immutable;
 
 @Immutable
 @Data

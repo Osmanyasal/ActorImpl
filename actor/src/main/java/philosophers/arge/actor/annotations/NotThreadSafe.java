@@ -1,5 +1,11 @@
-package philosophers.arge.actor;
+package philosophers.arge.actor.annotations;
 
+import static java.lang.annotation.ElementType.CONSTRUCTOR;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Target;
 import java.util.concurrent.locks.Lock;
 
 /**
@@ -14,6 +20,7 @@ import java.util.concurrent.locks.Lock;
  * @author osmanyasal
  *
  */
+@Target({ FIELD, METHOD, CONSTRUCTOR, ElementType.ANNOTATION_TYPE, ElementType.TYPE })
 public @interface NotThreadSafe {
 
 }

@@ -13,20 +13,37 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString.Exclude;
 import lombok.experimental.Accessors;
+import lombok.experimental.FieldNameConstants;
 import philosophers.arge.actor.ControlBlock.Status;
+import philosophers.arge.actor.annotations.GuardedBy;
+import philosophers.arge.actor.annotations.NotThreadSafe;
+import philosophers.arge.actor.annotations.ThreadSafe;
+import philosophers.arge.actor.divisionstrategies.DivisionStrategy;
 
+/**
+ * Actors itself is {@code NotThreadSafe} because every actor has it's data to
+ * process and runs on a thread.<br>
+ * Only some <b>enq()</b> and <b>deq()</b> methods are designed as
+ * {@code ThreadSafe} to prevent ambiguity on message passing from other actors
+ * 
+ * @author osmanyasal
+ *
+ * @param <T>
+ */
+@NotThreadSafe
 @Data
 @Accessors(chain = true)
-public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminator<TMessage> {
+@FieldNameConstants
+public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 
-	@Setter(value = AccessLevel.PRIVATE)
-	private String topic;
- 
 	@Setter(value = AccessLevel.PRIVATE)
 	private ControlBlock cb;
 
 	@Setter(value = AccessLevel.PRIVATE)
-	private List<ActorMessage<TMessage>> queue;
+	private String topic;
+
+	@Setter(value = AccessLevel.PRIVATE)
+	private List<ActorMessage<T>> queue;
 
 	@Exclude
 	@Setter(value = AccessLevel.PRIVATE)
@@ -34,10 +51,9 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 
 	/**
 	 * Every actor might have only one child actor.
-	 */
-	@Exclude
+	 */ 
 	@Setter(value = AccessLevel.PRIVATE)
-	private Actor<TMessage> childActor;
+	private Actor<T> childActor;
 
 	@Exclude
 	@Setter(value = AccessLevel.PRIVATE)
@@ -49,7 +65,7 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 	@Getter(value = AccessLevel.PRIVATE)
 	private Lock queueLock;
 
-	private DivisionStrategy<TMessage> divisionStrategy;
+	private DivisionStrategy<T> divisionStrategy;
 
 	/**
 	 * Every actor object must have a topic which defines the job they do. And every
@@ -60,19 +76,17 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 	 * @param router
 	 * @param priority can be omitted.(appoint to Low, by default)
 	 */
-	protected Actor(ActorConfig<TMessage> config) {
+	protected Actor(ActorConfig<T> config) {
 		adjustConfigurations(config);
 		init();
 	}
 
-	@NotThreadSafe
-	private void adjustConfigurations(ActorConfig<TMessage> config) {
+	private void adjustConfigurations(ActorConfig<T> config) {
 		this.topic = config.getTopic();
 		this.router = config.getRouter();
 		this.divisionStrategy = config.getDivisionStrategy();
 	}
 
-	@NotThreadSafe
 	private void init() {
 		this.queueLock = new ReentrantLock(true);
 		this.cb = new ControlBlock(ActorType.WORKER, Status.PASSIVE, true);
@@ -80,7 +94,6 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 		this.isNotified = false;
 	}
 
-	@NotThreadSafe
 	public final int getActiveNodeCount() {
 		int result = 0;
 		Actor<?> iter = this;
@@ -99,8 +112,7 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 	 * 
 	 * @param message
 	 */
-	@NotThreadSafe
-	public final void load(ActorMessage<TMessage> message) {
+	public final void load(ActorMessage<T> message) {
 		if (divisionStrategy.isConditionValid(this)) {
 			divisionStrategy.executeLoadingStrategy(this, Arrays.asList(message));
 		} else {
@@ -115,8 +127,8 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 	 * 
 	 * @param messageList
 	 */
-	@NotThreadSafe
-	public final void loadAll(List<ActorMessage<TMessage>> messageList) {
+
+	public final void loadAll(List<ActorMessage<T>> messageList) {
 		if (divisionStrategy.isConditionValid(this)) {
 			divisionStrategy.executeLoadingStrategy(this, messageList);
 		} else {
@@ -134,8 +146,7 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 	 * 
 	 * @param messageList
 	 */
-	@NotThreadSafe
-	public final void sendAll(List<ActorMessage<TMessage>> messageList) {
+	public final void sendAll(List<ActorMessage<T>> messageList) {
 		loadAll(messageList);
 		sendExecutionRequest();
 	}
@@ -147,7 +158,7 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 	 * @param message
 	 */
 	@ThreadSafe
-	public final void sendByLocking(ActorMessage<TMessage> message) {
+	public final void sendByLocking(ActorMessage<T> message) {
 		queueLock.lock();
 		try {
 			if (divisionStrategy.isConditionValid(this)) {
@@ -162,13 +173,14 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 	}
 
 	/**
-	 * adds list of messages to the actor's queue and then notifies the router uses
+	 * Adds list of messages to the actor's queue and then notifies the router uses
 	 * locking mechanishm in order to avoid data race!
 	 * 
 	 * @param messageList
 	 */
 	@ThreadSafe
-	public final void sendAllByLocking(List<ActorMessage<TMessage>> messageList) {
+	@GuardedBy(Actor.Fields.queueLock)
+	public final void sendAllByLocking(List<ActorMessage<T>> messageList) {
 		queueLock.lock();
 		try {
 			if (divisionStrategy.isConditionValid(this)) {
@@ -191,10 +203,9 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 	/**
 	 * Notify cluster for execution only if it's not currently executed!
 	 */
-	@NotThreadSafe
 	private void sendExecutionRequest() {
-		if (!this.isNotified && getCb().getStatus().equals(Status.PASSIVE)) {
-			this.router.getCluster().executeNode(this);
+		if (!this.isNotified && this.cb.getStatus().equals(Status.PASSIVE)) {
+			this.router.executeNode(this);
 			this.isNotified = true;
 		}
 	}
@@ -202,7 +213,6 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 	/**
 	 * send an execution request for both itself and it's children nodes.
 	 */
-	@NotThreadSafe
 	public void executeNodeStack() {
 		Actor<?> temp = this;
 		while (temp != null) {
@@ -219,7 +229,8 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 	 * @return
 	 */
 	@ThreadSafe
-	public final ActorMessage<TMessage> deq() {
+	@GuardedBy(Actor.Fields.queueLock)
+	public final ActorMessage<T> deq() {
 		queueLock.lock();
 		try {
 			if (this.queue.isEmpty())
@@ -236,8 +247,7 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 	 * 
 	 * @return {@code Actor}
 	 */
-	@NotThreadSafe
-	private final Actor<TMessage> initChildActor(Actor<TMessage> node) {
+	private final Actor<T> initChildActor(Actor<T> node) {
 		this.router.incrementActorCount(node.getTopic());
 		node.getCb().setIsRoot(false);
 		node.getCb().setStatus(Status.PASSIVE);
@@ -245,8 +255,12 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 		return node;
 	}
 
-	@NotThreadSafe
-	public final Actor<TMessage> fetchChildActor() {
+	/**
+	 * Returns an childActor if exists or else creates one and returns.
+	 * 
+	 * @return
+	 */
+	public final Actor<T> fetchChildActor() {
 		if (childActor != null)
 			return childActor;
 		return initChildActor(generateChildActor());
@@ -254,11 +268,11 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 
 	/**
 	 * 
-	 * Returns the waiting queue values and appoint the actor status to passsive!;
+	 * Returns the waiting queue values and appoint the actor status to
+	 * {@code Status.PASSIVE}
 	 * 
 	 */
-	@NotThreadSafe
-	public List<ActorMessage<TMessage>> terminate() {
+	public List<ActorMessage<T>> terminate() {
 		this.cb.setStatus(Status.PASSIVE);
 		if (childActor != null) {
 			queue.addAll(childActor.terminate());
@@ -267,8 +281,8 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 	}
 
 	/**
-	 * once the node is sent to threadPool this method is called you might want to
-	 * override this method for advanced computations.
+	 * Once the node is sent to threadPool this method is called.<br>
+	 * you might want to override this method for advanced computations.
 	 */
 	@Override
 	public Object call() throws Exception {
@@ -277,7 +291,6 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		// set status passive after execution is done!!
 		this.cb.setStatus(Status.PASSIVE);
 		this.isNotified = false;
 		return true;
@@ -289,5 +302,11 @@ public abstract class Actor<TMessage> implements Callable<Object>, ActorTerminat
 	 */
 	public abstract void operate();
 
-	public abstract Actor<TMessage> generateChildActor();
+	/**
+	 * This method must be implemented for creations of child actors that's used by
+	 * the {@code divisionStrategy}.
+	 * 
+	 * @return
+	 */
+	public abstract Actor<T> generateChildActor();
 }

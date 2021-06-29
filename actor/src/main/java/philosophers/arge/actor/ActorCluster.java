@@ -14,10 +14,15 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import lombok.Data;
+import lombok.ToString.Exclude;
 import lombok.experimental.Accessors;
 import lombok.experimental.FieldNameConstants;
 import philosophers.arge.actor.ClusterConfig.TerminationTime;
 import philosophers.arge.actor.ControlBlock.Status;
+import philosophers.arge.actor.annotations.GuardedBy;
+import philosophers.arge.actor.annotations.Immutable;
+import philosophers.arge.actor.annotations.NotThreadSafe;
+import philosophers.arge.actor.annotations.ThreadSafe;
 
 @Data
 @Accessors(chain = true)
@@ -27,9 +32,14 @@ public class ActorCluster implements ClusterTerminator {
 	private ControlBlock cb;
 	private RouterNode router;
 	private Object gateway;
+
+	@Exclude
 	private Map<String, List<Future<?>>> futures;
+
 	private TerminationTime terminationTime;
 	private Lock lock;
+
+	@Exclude
 	private ExecutorService pool;
 
 	public ActorCluster(ClusterConfig config) {
