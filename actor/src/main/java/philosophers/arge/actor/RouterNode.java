@@ -18,12 +18,12 @@ import philosophers.arge.actor.annotations.GuardedBy;
 import philosophers.arge.actor.annotations.Immutable;
 import philosophers.arge.actor.annotations.NotThreadSafe;
 import philosophers.arge.actor.annotations.ThreadSafe;
+import philosophers.arge.actor.exceptions.OccupiedTopicException;
 
 @Data
 @Accessors(chain = true)
 @FieldNameConstants
 public final class RouterNode implements RouterTerminator {
-	private static final String OCCUPIED_TOPIC = "This topic is already occupied!!";
 
 	@Setter(value = AccessLevel.PRIVATE)
 	private ControlBlock cb;
@@ -59,7 +59,7 @@ public final class RouterNode implements RouterTerminator {
 	@GuardedBy(RouterNode.Fields.lock)
 	public final void addRootActor(String topic, Actor<?> node) {
 		if (rootActors.containsKey(topic))
-			throw new RuntimeException(OCCUPIED_TOPIC);
+			throw new OccupiedTopicException();
 		lock.writeLock().lock();
 		try {
 			incrementActorCount(topic);
@@ -72,6 +72,9 @@ public final class RouterNode implements RouterTerminator {
 	@Immutable
 	@ThreadSafe
 	@GuardedBy(RouterNode.Fields.lock)
+	// normally it's not a best practice to return wildcard type but!
+	// since the implementer knows that what kind of root actor is calling
+	// we let the implentor to convert the returning actor.
 	public final Actor<?> getRootActor(String topic) {
 		lock.readLock().lock();
 		try {

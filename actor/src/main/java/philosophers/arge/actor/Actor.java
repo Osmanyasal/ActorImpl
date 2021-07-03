@@ -43,6 +43,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 	private String topic;
 
 	@Setter(value = AccessLevel.PRIVATE)
+	@Getter(value = AccessLevel.PRIVATE)
 	private List<ActorMessage<T>> queue;
 
 	@Exclude
@@ -51,7 +52,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 
 	/**
 	 * Every actor might have only one child actor.
-	 */ 
+	 */
 	@Setter(value = AccessLevel.PRIVATE)
 	private Actor<T> childActor;
 
@@ -94,15 +95,57 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 		this.isNotified = false;
 	}
 
+	/**
+	 * This is a basic snapshoot of the current root-child family. <br>
+	 * after calling this method the active node count both might be increased or
+	 * decrased.
+	 * 
+	 * @return
+	 */
+	@ThreadSafe
 	public final int getActiveNodeCount() {
 		int result = 0;
 		Actor<?> iter = this;
 		while (iter != null) {
-			if (iter.cb.getStatus().equals(Status.ACTIVE))
+			if (Status.ACTIVE.equals(iter.cb.getStatus()))
 				result++;
 			iter = iter.childActor;
 		}
 		return result;
+	}
+
+	@NotThreadSafe
+	public final int getQueueSize() {
+		return getQueue().size();
+	}
+
+	@NotThreadSafe
+	public final boolean isQueueEmpty() {
+		return getQueue().isEmpty();
+	}
+
+	@ThreadSafe
+	@GuardedBy(Actor.Fields.queueLock)
+	public final int getQueueSize_locked() {
+		queueLock.lock();
+		try {
+			return getQueue().size();
+		} finally {
+			queueLock.unlock();
+		}
+
+	}
+
+	@ThreadSafe
+	@GuardedBy(Actor.Fields.queueLock)
+	public final boolean isQueueEmpty_locked() {
+		queueLock.lock();
+		try {
+			return getQueue().isEmpty();
+		} finally {
+			queueLock.unlock();
+		}
+
 	}
 
 	/**
@@ -142,7 +185,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 	}
 
 	/**
-	 * send an execution request right after calling loadAll(messageList).
+	 * Send an execution request right after calling loadAll(messageList).
 	 * 
 	 * @param messageList
 	 */
@@ -152,12 +195,13 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 	}
 
 	/**
-	 * adds a message to the actor's queue and then notifies the router uses locking
+	 * Adds a message to the actor's queue and then notifies the router uses locking
 	 * mechanishm in order to avoid data race!
 	 * 
 	 * @param message
 	 */
 	@ThreadSafe
+	@GuardedBy(Actor.Fields.queueLock)
 	public final void sendByLocking(ActorMessage<T> message) {
 		queueLock.lock();
 		try {
@@ -230,7 +274,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 	 */
 	@ThreadSafe
 	@GuardedBy(Actor.Fields.queueLock)
-	public final ActorMessage<T> deq() {
+	private final ActorMessage<T> deq() {
 		queueLock.lock();
 		try {
 			if (this.queue.isEmpty())
@@ -241,9 +285,8 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 		}
 	}
 
-	// oop violation can't use actorNode!!!
 	/**
-	 * appoint the given Actor node as childActor and returns it.
+	 * Appoints the given Actor node as childActor and returns it.
 	 * 
 	 * @return {@code Actor}
 	 */
@@ -277,7 +320,9 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 		if (childActor != null) {
 			queue.addAll(childActor.terminate());
 		}
-		return queue;
+		List<ActorMessage<T>> response = queue;
+		queue = new LinkedList<>();
+		return response;
 	}
 
 	/**
@@ -287,7 +332,8 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 	@Override
 	public Object call() throws Exception {
 		try {
-			operate();
+			while (isProcessingAvailable())
+				operate(deq());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -297,10 +343,21 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 	}
 
 	/**
-	 * This method is the main objective that the node fulfil. Once you create an
-	 * ActorNode you must override this method.
+	 * This method defines that in what conditions actor continue to process waiting
+	 * messages.
+	 * 
+	 * @return
 	 */
-	public abstract void operate();
+	private boolean isProcessingAvailable() {
+		return !getQueue().isEmpty() && Status.ACTIVE.equals(cb.getStatus());
+	}
+
+	/**
+	 * This method is the main objective that the node fulfill. <br>
+	 * once the actor is executing by a thread of the threadPool, we'll send waiting
+	 * messages to this method to be operated.
+	 */
+	public abstract void operate(ActorMessage<T> msg);
 
 	/**
 	 * This method must be implemented for creations of child actors that's used by

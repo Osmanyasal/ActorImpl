@@ -28,6 +28,7 @@ import philosophers.arge.actor.annotations.ThreadSafe;
 @Accessors(chain = true)
 @FieldNameConstants
 public class ActorCluster implements ClusterTerminator {
+	private final String terminatedMessage;
 	private String name;
 	private ControlBlock cb;
 	private RouterNode router;
@@ -43,9 +44,10 @@ public class ActorCluster implements ClusterTerminator {
 	private ExecutorService pool;
 
 	public ActorCluster(ClusterConfig config) {
-		System.out.println(config);
+		terminatedMessage = String.format("Cluster '%s' Terminated!", config.getName());
 		adjustConfigurations(config);
 		init();
+		System.out.println(config);
 	}
 
 	@Immutable
@@ -91,7 +93,7 @@ public class ActorCluster implements ClusterTerminator {
 	@ThreadSafe
 	@GuardedBy(ActorCluster.Fields.lock)
 	public final void executeNode(Actor<?> node) {
-		if (node.getCb().getStatus().equals(Status.PASSIVE)) {
+		if (Status.PASSIVE.equals(node.getCb().getStatus())) {
 			node.getCb().setStatus(Status.ACTIVE);
 			lock.lock();
 			try {
@@ -110,6 +112,7 @@ public class ActorCluster implements ClusterTerminator {
 
 	@Immutable
 	@ThreadSafe
+	@GuardedBy(RouterNode.Fields.lock)
 	public final <T> void addRootActor(Actor<T> node) {
 		router.addRootActor(node.getTopic(), node);
 	}
@@ -117,7 +120,7 @@ public class ActorCluster implements ClusterTerminator {
 	private List<Runnable> terminateThreadPool() throws InterruptedException {
 		pool.shutdown();
 		try {
-			pool.awaitTermination(2, TimeUnit.SECONDS);
+			pool.awaitTermination(1, TimeUnit.SECONDS);
 		} finally {
 			if (!pool.isTerminated())
 				return pool.shutdownNow();
@@ -140,12 +143,12 @@ public class ActorCluster implements ClusterTerminator {
 		Map<String, List<?>> result = null;
 		try {
 			result = this.router.terminateRouter();
-			result.put("pool", terminateThreadPool());
+			result.put(ActorCluster.Fields.pool, terminateThreadPool());
 		} catch (Exception e) {
 			e.printStackTrace();
 		} finally {
 			this.cb.setStatus(Status.PASSIVE);
-			System.out.println("cluster terminated");
+			System.out.println(terminatedMessage);
 		}
 		return result;
 	}
@@ -155,15 +158,17 @@ public class ActorCluster implements ClusterTerminator {
 	public final void waitForTermination() throws InterruptedException {
 		Collection<List<Future<?>>> values = getFutures().values();
 		while (values.parallelStream().anyMatch(x -> x.stream().anyMatch(m -> !m.isDone())))
-			Thread.sleep(10);
+			Thread.sleep(7);
 		System.out.println("All tasks are done!");
+		System.gc();
 	}
 
 	@Immutable
 	public final void waitForTermination(String topic) throws InterruptedException {
 		List<Future<?>> list = getFutures().get(topic);
 		while (list.parallelStream().anyMatch(x -> !x.isDone()))
-			Thread.sleep(10);
+			Thread.sleep(7);
 		System.out.println(topic + " tasks are done!");
+		System.gc();
 	}
 }

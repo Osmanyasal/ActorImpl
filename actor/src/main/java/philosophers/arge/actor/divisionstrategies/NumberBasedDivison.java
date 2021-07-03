@@ -29,7 +29,7 @@ public final class NumberBasedDivison<T> implements DivisionStrategy<T> {
 
 	@Override
 	public boolean isConditionValid(Actor<T> actor) {
-		return actor.getQueue().size() >= queueLimit;
+		return actor.getQueueSize() >= queueLimit;
 	}
 
 	@Override
