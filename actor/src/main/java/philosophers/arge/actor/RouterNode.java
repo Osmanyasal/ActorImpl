@@ -1,11 +1,10 @@
 package philosophers.arge.actor;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import lombok.AccessLevel;
 import lombok.Data;
@@ -13,15 +12,18 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString.Exclude;
 import lombok.experimental.Accessors;
+import lombok.experimental.FieldNameConstants;
 import philosophers.arge.actor.ControlBlock.Status;
+import philosophers.arge.actor.annotations.GuardedBy;
+import philosophers.arge.actor.annotations.Immutable;
+import philosophers.arge.actor.annotations.NotThreadSafe;
+import philosophers.arge.actor.annotations.ThreadSafe;
+import philosophers.arge.actor.exceptions.OccupiedTopicException;
 
 @Data
 @Accessors(chain = true)
-public final class RouterNode implements Terminable<Object> {
-
-	@Getter(value = AccessLevel.PRIVATE)
-	@Setter(value = AccessLevel.PRIVATE)
-	private Lock lock;
+@FieldNameConstants
+public final class RouterNode implements RouterTerminator {
 
 	@Setter(value = AccessLevel.PRIVATE)
 	private ControlBlock cb;
@@ -31,48 +33,83 @@ public final class RouterNode implements Terminable<Object> {
 	private Map<String, Actor<?>> rootActors;
 
 	@Setter(value = AccessLevel.PRIVATE)
-	private Map<String, Integer> actorCount;
+	@Getter(value = AccessLevel.PRIVATE)
+	private Map<String, Integer> actorCountMap;
 
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
-	private Map<String, Actor<?>> remoteRootActors;
-
-	@Setter(value = AccessLevel.PRIVATE)
 	@Exclude
 	private ActorCluster cluster;
 
+	@Getter(value = AccessLevel.PRIVATE)
+	@Setter(value = AccessLevel.PRIVATE)
+	@Exclude
+	private ReadWriteLock lock;
+
 	public RouterNode(ActorCluster cluster) {
 		this.cluster = cluster;
-		this.lock = new ReentrantLock();
-		this.cb = new ControlBlock(ActorType.ROUTER, Status.ACTIVE, true);
+		this.cb = ControlBlockFactory.createCb(ActorType.ROUTER);
 		this.rootActors = new HashMap<>();
-		this.remoteRootActors = new HashMap<>();
-		this.actorCount = new HashMap<>();
+		this.actorCountMap = new HashMap<>();
+		this.lock = new ReentrantReadWriteLock();
 	}
 
+	@Immutable
+	@ThreadSafe
+	@GuardedBy(RouterNode.Fields.lock)
 	public final void addRootActor(String topic, Actor<?> node) {
-
 		if (rootActors.containsKey(topic))
-			throw new RuntimeException("This topic is already occupied!!");
-
-		actorCount.put(topic, 1);
-		rootActors.put(topic, node);
-		node.getCb().setStatus(Status.PASSIVE);
+			throw new OccupiedTopicException();
+		lock.writeLock().lock();
+		try {
+			incrementActorCount(topic);
+			rootActors.put(topic, node);
+		} finally {
+			lock.writeLock().unlock();
+		}
 	}
 
+	@Immutable
+	@ThreadSafe
+	@GuardedBy(RouterNode.Fields.lock)
+	// normally it's not a best practice to return wildcard type but!
+	// since the implementer knows that what kind of root actor is calling
+	// we let the implentor to convert the returning actor.
 	public final Actor<?> getRootActor(String topic) {
-		return rootActors.containsKey(topic) ? rootActors.get(topic) : null;
+		lock.readLock().lock();
+		try {
+			return rootActors.containsKey(topic) ? rootActors.get(topic) : null;
+		} finally {
+			lock.readLock().unlock();
+		}
+	}
+
+	@Immutable
+	@NotThreadSafe
+	public final void incrementActorCount(String topic) {
+		if (this.actorCountMap.containsKey(topic))
+			this.actorCountMap.put(topic, this.actorCountMap.get(topic) + 1);
+		else
+			this.actorCountMap.put(topic, 1);
+	}
+
+	@Immutable
+	@ThreadSafe
+	@GuardedBy(ActorCluster.Fields.lock)
+	public final void executeNode(Actor<?> node) {
+		cluster.executeNode(node);
 	}
 
 	@Override
-	public List<Object> terminate() {
-		// save queue if neccessary!!
-		getCb().setStatus(Status.PASSIVE);
+	@NotThreadSafe
+	public Map<String, List<?>> terminateRouter() {
+		Map<String, List<?>> waitingJobs = new HashMap<>();
+		this.cb.setStatus(Status.PASSIVE);
 		for (String key : rootActors.keySet()) {
-			rootActors.get(key).terminate();
+			waitingJobs.put(key, rootActors.get(key).terminate());
 		}
 		rootActors.clear();
-		remoteRootActors.clear();
-		return new ArrayList<>();
+		actorCountMap.clear();
+		return waitingJobs;
 	}
 }

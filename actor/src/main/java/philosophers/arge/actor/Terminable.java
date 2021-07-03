@@ -1,7 +1,13 @@
 package philosophers.arge.actor;
 
-import java.util.List;
-
-public interface Terminable<TMessage> {
-	List<TMessage> terminate();
+/**
+ * Marker interface
+ * 
+ * This interface implies that the related object has a life circle and it's
+ * terminable.
+ * 
+ * @author osmanyasal
+ *
+ */
+public interface Terminable {
 }

@@ -9,27 +9,42 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import lombok.AccessLevel;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString.Exclude;
 import lombok.experimental.Accessors;
+import lombok.experimental.FieldNameConstants;
 import philosophers.arge.actor.ControlBlock.Status;
+import philosophers.arge.actor.annotations.GuardedBy;
+import philosophers.arge.actor.annotations.NotThreadSafe;
+import philosophers.arge.actor.annotations.ThreadSafe;
+import philosophers.arge.actor.divisionstrategies.DivisionStrategy;
 
+/**
+ * Actors itself is {@code NotThreadSafe} because every actor has it's data to
+ * process and runs on a thread.<br>
+ * Only some <b>enq()</b> and <b>deq()</b> methods are designed as
+ * {@code ThreadSafe} to prevent ambiguity on message passing from other actors
+ * 
+ * @author osmanyasal
+ *
+ * @param <T>
+ */
+@NotThreadSafe
 @Data
-@EqualsAndHashCode(callSuper = true)
 @Accessors(chain = true)
-public abstract class Actor<TMessage> extends ActorMessage<TMessage>
-		implements Callable<Object>, Comparable<Actor<?>>, Terminable<ActorMessage<TMessage>> {
-
-	@Setter(value = AccessLevel.PRIVATE)
-	private String topic;
+@FieldNameConstants
+public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 
 	@Setter(value = AccessLevel.PRIVATE)
 	private ControlBlock cb;
 
 	@Setter(value = AccessLevel.PRIVATE)
-	private List<ActorMessage<TMessage>> queue;
+	private String topic;
+
+	@Setter(value = AccessLevel.PRIVATE)
+	@Getter(value = AccessLevel.PRIVATE)
+	private List<ActorMessage<T>> queue;
 
 	@Exclude
 	@Setter(value = AccessLevel.PRIVATE)
@@ -39,20 +54,19 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * Every actor might have only one child actor.
 	 */
 	@Setter(value = AccessLevel.PRIVATE)
-	private Actor<TMessage> childActor;
+	private Actor<T> childActor;
 
-	@Setter(value = AccessLevel.PRIVATE)
-	private ActorPriority priority;
-
+	@Exclude
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
 	private boolean isNotified;
 
+	@Exclude
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
 	private Lock queueLock;
 
-	private DivisionStrategy<TMessage> divisionStrategy;
+	private DivisionStrategy<T> divisionStrategy;
 
 	/**
 	 * Every actor object must have a topic which defines the job they do. And every
@@ -63,25 +77,85 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * @param router
 	 * @param priority can be omitted.(appoint to Low, by default)
 	 */
-	protected Actor(String topic, RouterNode router, ActorPriority priority,
-			DivisionStrategy<TMessage> divisionStrategy) {
-		this.topic = topic;
-		this.router = router;
+	protected Actor(ActorConfig<T> config) {
+		adjustConfigurations(config);
+		init();
+	}
+
+	private void adjustConfigurations(ActorConfig<T> config) {
+		this.topic = config.getTopic();
+		this.router = config.getRouter();
+		this.divisionStrategy = config.getDivisionStrategy();
+	}
+
+	private void init() {
+		this.queueLock = new ReentrantLock(true);
 		this.cb = new ControlBlock(ActorType.WORKER, Status.PASSIVE, true);
 		this.queue = new LinkedList<>();
-		this.priority = priority == null ? ActorPriority.LOW : priority;
 		this.isNotified = false;
-		this.queueLock = new ReentrantLock();
-		this.divisionStrategy = divisionStrategy;
 	}
 
 	/**
-	 * adds a message to the actor's queue and then notifies the router. data race
-	 * is possible!
+	 * This is a basic snapshoot of the current root-child family. <br>
+	 * after calling this method the active node count both might be increased or
+	 * decrased.
+	 * 
+	 * @return
+	 */
+	@ThreadSafe
+	public final int getActiveNodeCount() {
+		int result = 0;
+		Actor<?> iter = this;
+		while (iter != null) {
+			if (Status.ACTIVE.equals(iter.cb.getStatus()))
+				result++;
+			iter = iter.childActor;
+		}
+		return result;
+	}
+
+	@NotThreadSafe
+	public final int getQueueSize() {
+		return getQueue().size();
+	}
+
+	@NotThreadSafe
+	public final boolean isQueueEmpty() {
+		return getQueue().isEmpty();
+	}
+
+	@ThreadSafe
+	@GuardedBy(Actor.Fields.queueLock)
+	public final int getQueueSize_locked() {
+		queueLock.lock();
+		try {
+			return getQueue().size();
+		} finally {
+			queueLock.unlock();
+		}
+
+	}
+
+	@ThreadSafe
+	@GuardedBy(Actor.Fields.queueLock)
+	public final boolean isQueueEmpty_locked() {
+		queueLock.lock();
+		try {
+			return getQueue().isEmpty();
+		} finally {
+			queueLock.unlock();
+		}
+
+	}
+
+	/**
+	 * Adds a message to the actor's queue according to loadingStrategy.<br>
+	 * it's good to use to inititilize an actor that has some data to process.<br>
+	 * <b>Data race is possible!</b>
 	 * 
 	 * @param message
 	 */
-	public final void load(ActorMessage<TMessage> message) {
+	public final void load(ActorMessage<T> message) {
 		if (divisionStrategy.isConditionValid(this)) {
 			divisionStrategy.executeLoadingStrategy(this, Arrays.asList(message));
 		} else {
@@ -90,18 +164,20 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	}
 
 	/**
-	 * adds list of messages to the actor's queue and then notifies the router. data
-	 * race is possible!
+	 * Adds a message to the actor's queue according to loadingStrategy.<br>
+	 * it's good to use to inititilize an actor that has some data to process.<br>
+	 * <b>Data race is possible!</b>
 	 * 
 	 * @param messageList
 	 */
-	public final void loadAll(List<ActorMessage<TMessage>> messageList) {
+
+	public final void loadAll(List<ActorMessage<T>> messageList) {
 		if (divisionStrategy.isConditionValid(this)) {
 			divisionStrategy.executeLoadingStrategy(this, messageList);
 		} else {
 			messageList.stream().forEach(x -> {
 				if (divisionStrategy.isConditionValid(this)) {
-					divisionStrategy.executeLoadingStrategy(this, messageList);
+					divisionStrategy.executeLoadingStrategy(this, Arrays.asList(x));
 				} else
 					queue.add(x);
 			});
@@ -109,12 +185,24 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	}
 
 	/**
-	 * adds a message to the actor's queue and then notifies the router uses locking
+	 * Send an execution request right after calling loadAll(messageList).
+	 * 
+	 * @param messageList
+	 */
+	public final void sendAll(List<ActorMessage<T>> messageList) {
+		loadAll(messageList);
+		sendExecutionRequest();
+	}
+
+	/**
+	 * Adds a message to the actor's queue and then notifies the router uses locking
 	 * mechanishm in order to avoid data race!
 	 * 
 	 * @param message
 	 */
-	public final void sendByLocking(ActorMessage<TMessage> message) {
+	@ThreadSafe
+	@GuardedBy(Actor.Fields.queueLock)
+	public final void sendByLocking(ActorMessage<T> message) {
 		queueLock.lock();
 		try {
 			if (divisionStrategy.isConditionValid(this)) {
@@ -129,12 +217,14 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	}
 
 	/**
-	 * adds list of messages to the actor's queue and then notifies the router uses
+	 * Adds list of messages to the actor's queue and then notifies the router uses
 	 * locking mechanishm in order to avoid data race!
 	 * 
 	 * @param messageList
 	 */
-	public final void sendAllByLocking(List<ActorMessage<TMessage>> messageList) {
+	@ThreadSafe
+	@GuardedBy(Actor.Fields.queueLock)
+	public final void sendAllByLocking(List<ActorMessage<T>> messageList) {
 		queueLock.lock();
 		try {
 			if (divisionStrategy.isConditionValid(this)) {
@@ -142,7 +232,7 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 			} else {
 				messageList.stream().forEach(x -> {
 					if (divisionStrategy.isConditionValid(this)) {
-						divisionStrategy.executeSendingStrategy(this, messageList);
+						divisionStrategy.executeSendingStrategy(this, Arrays.asList(x));
 					} else
 						queue.add(x);
 				});
@@ -155,30 +245,11 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	}
 
 	/**
-	 * used for parent -> child message transfer
-	 * 
-	 * @param messageList
-	 */
-	public final void sendAll(List<ActorMessage<TMessage>> messageList) {
-		if (divisionStrategy.isConditionValid(this)) {
-			divisionStrategy.executeSendingStrategy(this, messageList);
-		} else {
-			messageList.stream().forEach(x -> {
-				if (divisionStrategy.isConditionValid(this)) {
-					divisionStrategy.executeSendingStrategy(this, messageList);
-				} else
-					queue.add(x);
-			});
-			sendExecutionRequest();
-		}
-	}
-
-	/**
 	 * Notify cluster for execution only if it's not currently executed!
 	 */
 	private void sendExecutionRequest() {
-		if (!this.isNotified && getCb().getStatus().equals(Status.PASSIVE)) {
-			getRouter().getCluster().executeNode(this);
+		if (!this.isNotified && this.cb.getStatus().equals(Status.PASSIVE)) {
+			this.router.executeNode(this);
 			this.isNotified = true;
 		}
 	}
@@ -201,33 +272,38 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 	 * 
 	 * @return
 	 */
-	public final ActorMessage<TMessage> deq() {
+	@ThreadSafe
+	@GuardedBy(Actor.Fields.queueLock)
+	private final ActorMessage<T> deq() {
 		queueLock.lock();
 		try {
-			if (getQueue().size() == 0)
-				return new ActorMessage<>();
+			if (this.queue.isEmpty())
+				return new ActorMessage<>(null);
 			return queue.remove(0);
 		} finally {
 			queueLock.unlock();
 		}
-
 	}
 
-	// oop violation can't use actorNode!!!
 	/**
-	 * appoint the given Actor node as childActor and returns it.
+	 * Appoints the given Actor node as childActor and returns it.
 	 * 
 	 * @return {@code Actor}
 	 */
-	private final Actor<TMessage> initChildActor(Actor<TMessage> node) {
-		getRouter().getActorCount().put(node.getTopic(), getRouter().getActorCount().get(node.getTopic()) + 1);
+	private final Actor<T> initChildActor(Actor<T> node) {
+		this.router.incrementActorCount(node.getTopic());
 		node.getCb().setIsRoot(false);
 		node.getCb().setStatus(Status.PASSIVE);
 		childActor = node;
 		return node;
 	}
 
-	public final Actor<TMessage> fetchChildActor() {
+	/**
+	 * Returns an childActor if exists or else creates one and returns.
+	 * 
+	 * @return
+	 */
+	public final Actor<T> fetchChildActor() {
 		if (childActor != null)
 			return childActor;
 		return initChildActor(generateChildActor());
@@ -235,48 +311,59 @@ public abstract class Actor<TMessage> extends ActorMessage<TMessage>
 
 	/**
 	 * 
-	 * Returns the waiting queue values and appoint the actor status to passsive!;
+	 * Returns the waiting queue values and appoint the actor status to
+	 * {@code Status.PASSIVE}
 	 * 
 	 */
-	public List<ActorMessage<TMessage>> terminate() {
-		getCb().setStatus(Status.PASSIVE);
+	public List<ActorMessage<T>> terminate() {
+		this.cb.setStatus(Status.PASSIVE);
 		if (childActor != null) {
 			queue.addAll(childActor.terminate());
 		}
-		return queue;
-	}
-
-	@Override
-	public int compareTo(Actor<?> o) {
-		return compare(getPriority().getRange(), o.getPriority().getRange());
-	}
-
-	private static int compare(float x, float y) {
-		return (x < y) ? -1 : ((x == y) ? 0 : 1);
+		List<ActorMessage<T>> response = queue;
+		queue = new LinkedList<>();
+		return response;
 	}
 
 	/**
-	 * once the node is sent to threadPool this method is called you might want to
-	 * override this method for advanced computations.
+	 * Once the node is sent to threadPool this method is called.<br>
+	 * you might want to override this method for advanced computations.
 	 */
 	@Override
 	public Object call() throws Exception {
 		try {
-			operate();
+			while (isProcessingAvailable())
+				operate(deq());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		// set status passive after execution is done!!
-		getCb().setStatus(Status.PASSIVE);
+		this.cb.setStatus(Status.PASSIVE);
 		this.isNotified = false;
 		return true;
 	}
 
 	/**
-	 * This method is the main objective that the node fulfil. Once you create an
-	 * ActorNode you must override this method.
+	 * This method defines that in what conditions actor continue to process waiting
+	 * messages.
+	 * 
+	 * @return
 	 */
-	public abstract void operate();
+	private boolean isProcessingAvailable() {
+		return !getQueue().isEmpty() && Status.ACTIVE.equals(cb.getStatus());
+	}
 
-	public abstract Actor<TMessage> generateChildActor();
+	/**
+	 * This method is the main objective that the node fulfill. <br>
+	 * once the actor is executing by a thread of the threadPool, we'll send waiting
+	 * messages to this method to be operated.
+	 */
+	public abstract void operate(ActorMessage<T> msg);
+
+	/**
+	 * This method must be implemented for creations of child actors that's used by
+	 * the {@code divisionStrategy}.
+	 * 
+	 * @return
+	 */
+	public abstract Actor<T> generateChildActor();
 }

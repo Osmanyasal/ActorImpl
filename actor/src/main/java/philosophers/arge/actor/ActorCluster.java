@@ -1,8 +1,8 @@
 package philosophers.arge.actor;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,29 +14,43 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import lombok.Data;
+import lombok.ToString.Exclude;
 import lombok.experimental.Accessors;
+import lombok.experimental.FieldNameConstants;
 import philosophers.arge.actor.ClusterConfig.TerminationTime;
 import philosophers.arge.actor.ControlBlock.Status;
+import philosophers.arge.actor.annotations.GuardedBy;
+import philosophers.arge.actor.annotations.Immutable;
+import philosophers.arge.actor.annotations.NotThreadSafe;
+import philosophers.arge.actor.annotations.ThreadSafe;
 
 @Data
 @Accessors(chain = true)
-public class ActorCluster implements Terminable<Object> {
+@FieldNameConstants
+public class ActorCluster implements ClusterTerminator {
+	private final String terminatedMessage;
 	private String name;
 	private ControlBlock cb;
 	private RouterNode router;
 	private Object gateway;
+
+	@Exclude
 	private Map<String, List<Future<?>>> futures;
+
 	private TerminationTime terminationTime;
 	private Lock lock;
 
+	@Exclude
 	private ExecutorService pool;
 
 	public ActorCluster(ClusterConfig config) {
-		System.out.println(config);
+		terminatedMessage = String.format("Cluster '%s' Terminated!", config.getName());
 		adjustConfigurations(config);
 		init();
+		System.out.println(config);
 	}
 
+	@Immutable
 	private final void init() {
 		this.cb = new ControlBlock(ActorType.CLUSTER, Status.ACTIVE, true);
 		this.futures = new HashMap<>();
@@ -44,23 +58,30 @@ public class ActorCluster implements Terminable<Object> {
 		this.router = new RouterNode(this);
 	}
 
+	@Immutable
 	private final void adjustConfigurations(ClusterConfig config) {
 		this.name = config.getName();
 		this.pool = Executors.newFixedThreadPool(config.getThreadCount());
 		this.terminationTime = config.getTerminationTime();
 	}
 
+	@Immutable
+	@NotThreadSafe
 	public final int getActiveNodeCount(String topic) {
-		return 0;
+		return router.getRootActor(topic).getActiveNodeCount();
 	}
 
+	@Immutable
+	@NotThreadSafe
 	public final int getActiveNodeCount() {
 		return 0;
 	}
 
+	@Immutable
+	@NotThreadSafe
 	public final int getNodeCount(String topic) {
 		int count = 0;
-		Actor<?> actor = getRouter().getRootActor(topic);
+		Actor<?> actor = this.router.getRootActor(topic);
 		while (actor != null) {
 			count++;
 			actor = actor.getChildActor();
@@ -68,19 +89,11 @@ public class ActorCluster implements Terminable<Object> {
 		return count;
 	}
 
-	public final void removeFuture(String topicName) {
-		lock.lock();
-		try {
-
-			if (futures.containsKey(topicName))
-				futures.remove(topicName);
-		} finally {
-			lock.unlock();
-		}
-	}
-
+	@Immutable
+	@ThreadSafe
+	@GuardedBy(ActorCluster.Fields.lock)
 	public final void executeNode(Actor<?> node) {
-		if (node.getCb().getStatus().equals(Status.PASSIVE)) {
+		if (Status.PASSIVE.equals(node.getCb().getStatus())) {
 			node.getCb().setStatus(Status.ACTIVE);
 			lock.lock();
 			try {
@@ -97,52 +110,65 @@ public class ActorCluster implements Terminable<Object> {
 		}
 	}
 
-	// TODO:make this process better
-	public List<Object> terminate() {
-		terminateRouter();
-		try {
-			terminateThreadPool();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-		getCb().setStatus(Status.PASSIVE);
-		System.out.println("cluster terminated!");
-		return Arrays.asList(0);
-	}
-
-	public final void waitForTermination() throws InterruptedException {
-		Collection<List<Future<?>>> values = getFutures().values();
-		while (!values.parallelStream().allMatch(x -> x.stream().allMatch(m -> m.isDone())))
-			Thread.sleep(3);
-
-		System.out.println("All tasks are done!");
-	}
-
-	public final void waitForTermination(String topic) throws InterruptedException {
-		List<Future<?>> list = getFutures().get(topic);
-		while (!list.parallelStream().allMatch(x -> x.isDone()))
-			Thread.sleep(3);
-
-		System.out.println(topic + " tasks are done!");
-	}
-
+	@Immutable
+	@ThreadSafe
+	@GuardedBy(RouterNode.Fields.lock)
 	public final <T> void addRootActor(Actor<T> node) {
 		router.addRootActor(node.getTopic(), node);
 	}
 
-	// TODO:make this private
-	public List<Runnable> terminateThreadPool() throws InterruptedException {
+	private List<Runnable> terminateThreadPool() throws InterruptedException {
 		pool.shutdown();
 		try {
-			pool.awaitTermination(2, TimeUnit.SECONDS);
+			pool.awaitTermination(1, TimeUnit.SECONDS);
 		} finally {
 			if (!pool.isTerminated())
 				return pool.shutdownNow();
 		}
-		return null;
+		return Collections.emptyList();
 	}
 
-	private void terminateRouter() {
-		router.terminate();
+	/**
+	 * returns Map<String, List<?>> <br>
+	 * ex: <br>
+	 * { <br>
+	 * "node1" : [ActorMessage(msg = "msg1"),ActorMessage(msg = "msg2")], <br>
+	 * "node2" : [ActorMessage(msg = 5),ActorMessage(msg = 382)], <br>
+	 * "pool" : [Callable(...),Callable(...)], <br>
+	 * <br>
+	 * } <br>
+	 */
+	@Override
+	public Map<String, List<?>> terminateCluster() {
+		Map<String, List<?>> result = null;
+		try {
+			result = this.router.terminateRouter();
+			result.put(ActorCluster.Fields.pool, terminateThreadPool());
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally {
+			this.cb.setStatus(Status.PASSIVE);
+			System.out.println(terminatedMessage);
+		}
+		return result;
+	}
+
+	@Immutable
+	// TODO:Bitip bitmediği bilgisi root dugumlerden sorulsun
+	public final void waitForTermination() throws InterruptedException {
+		Collection<List<Future<?>>> values = getFutures().values();
+		while (values.parallelStream().anyMatch(x -> x.stream().anyMatch(m -> !m.isDone())))
+			Thread.sleep(7);
+		System.out.println("All tasks are done!");
+		System.gc();
+	}
+
+	@Immutable
+	public final void waitForTermination(String topic) throws InterruptedException {
+		List<Future<?>> list = getFutures().get(topic);
+		while (list.parallelStream().anyMatch(x -> !x.isDone()))
+			Thread.sleep(7);
+		System.out.println(topic + " tasks are done!");
+		System.gc();
 	}
 }
