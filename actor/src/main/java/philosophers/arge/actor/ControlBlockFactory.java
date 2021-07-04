@@ -17,7 +17,7 @@ public final class ControlBlockFactory {
 		case GATWEWAY:
 			return new ControlBlock(ActorType.GATWEWAY, Status.ACTIVE, true);
 		case WORKER:
-			return new ControlBlock(ActorType.WORKER, Status.ACTIVE, true);
+			return new ControlBlock(ActorType.WORKER, Status.PASSIVE, true);
 
 		default:
 			System.out.println(NOT_FOUND);
