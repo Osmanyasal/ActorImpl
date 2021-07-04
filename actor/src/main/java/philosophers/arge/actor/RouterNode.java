@@ -30,11 +30,11 @@ public final class RouterNode implements RouterTerminator {
 
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
-	private Map<String, Actor<?>> rootActors;
+	private Map<String, Integer> actorCountMap;
 
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
-	private Map<String, Integer> actorCountMap;
+	private Map<String, Actor<?>> rootActors;
 
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
@@ -47,8 +47,12 @@ public final class RouterNode implements RouterTerminator {
 	private ReadWriteLock lock;
 
 	public RouterNode(ActorCluster cluster) {
-		this.cluster = cluster;
+		init(cluster);
+	}
+
+	private void init(ActorCluster cluster) {
 		this.cb = ControlBlockFactory.createCb(ActorType.ROUTER);
+		this.cluster = cluster;
 		this.rootActors = new HashMap<>();
 		this.actorCountMap = new HashMap<>();
 		this.lock = new ReentrantReadWriteLock();
@@ -86,7 +90,7 @@ public final class RouterNode implements RouterTerminator {
 
 	@Immutable
 	@NotThreadSafe
-	public final void incrementActorCount(String topic) {
+	protected final void incrementActorCount(String topic) {
 		if (this.actorCountMap.containsKey(topic))
 			this.actorCountMap.put(topic, this.actorCountMap.get(topic) + 1);
 		else
@@ -95,21 +99,30 @@ public final class RouterNode implements RouterTerminator {
 
 	@Immutable
 	@ThreadSafe
-	@GuardedBy(ActorCluster.Fields.lock)
+	@GuardedBy(ActorCluster.Fields.poolLock)
 	public final void executeNode(Actor<?> node) {
 		cluster.executeNode(node);
 	}
 
+	/**
+	 * returns Map<String, List<?>> <br>
+	 * ex: <br>
+	 * { <br>
+	 * "node1" : [ActorMessage(msg = "msg1"),ActorMessage(msg = "msg2")], <br>
+	 * "node2" : [ActorMessage(msg = 5),ActorMessage(msg = 382)], <br>
+	 * <br>
+	 * } <br>
+	 */
 	@Override
 	@NotThreadSafe
 	public Map<String, List<?>> terminateRouter() {
 		Map<String, List<?>> waitingJobs = new HashMap<>();
-		this.cb.setStatus(Status.PASSIVE);
 		for (String key : rootActors.keySet()) {
 			waitingJobs.put(key, rootActors.get(key).terminate());
 		}
 		rootActors.clear();
 		actorCountMap.clear();
+		this.cb.setStatus(Status.PASSIVE);
 		return waitingJobs;
 	}
 }

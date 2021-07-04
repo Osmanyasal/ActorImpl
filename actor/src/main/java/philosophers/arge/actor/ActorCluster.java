@@ -38,7 +38,8 @@ public class ActorCluster implements ClusterTerminator {
 	private Map<String, List<Future<?>>> futures;
 
 	private TerminationTime terminationTime;
-	private Lock lock;
+
+	private Lock poolLock;
 
 	@Exclude
 	private ExecutorService pool;
@@ -54,7 +55,7 @@ public class ActorCluster implements ClusterTerminator {
 	private final void init() {
 		this.cb = new ControlBlock(ActorType.CLUSTER, Status.ACTIVE, true);
 		this.futures = new HashMap<>();
-		this.lock = new ReentrantLock();
+		this.poolLock = new ReentrantLock();
 		this.router = new RouterNode(this);
 	}
 
@@ -91,11 +92,11 @@ public class ActorCluster implements ClusterTerminator {
 
 	@Immutable
 	@ThreadSafe
-	@GuardedBy(ActorCluster.Fields.lock)
+	@GuardedBy(ActorCluster.Fields.poolLock)
 	public final void executeNode(Actor<?> node) {
 		if (Status.PASSIVE.equals(node.getCb().getStatus())) {
 			node.getCb().setStatus(Status.ACTIVE);
-			lock.lock();
+			poolLock.lock();
 			try {
 				if (futures.containsKey(node.getTopic()))
 					futures.get(node.getTopic()).add(pool.submit(node));
@@ -105,7 +106,7 @@ public class ActorCluster implements ClusterTerminator {
 					futures.put(node.getTopic(), futureList);
 				}
 			} finally {
-				lock.unlock();
+				poolLock.unlock();
 			}
 		}
 	}
@@ -117,10 +118,28 @@ public class ActorCluster implements ClusterTerminator {
 		router.addRootActor(node.getTopic(), node);
 	}
 
-	private List<Runnable> terminateThreadPool() throws InterruptedException {
+	@Immutable
+	@ThreadSafe
+	@GuardedBy(ActorCluster.Fields.poolLock)
+	public void abortThreadPoolTasks() throws InterruptedException {
+		poolLock.lock();
+		System.out.println("aborting thread pool tasks");
+		try {
+			for (String key : futures.keySet()) {
+				futures.get(key).forEach(x -> x.cancel(true));
+			}
+
+		} finally {
+			poolLock.unlock();
+		}
+	}
+
+	private List<Runnable> terminateThreadPool() {
 		pool.shutdown();
 		try {
 			pool.awaitTermination(1, TimeUnit.SECONDS);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
 		} finally {
 			if (!pool.isTerminated())
 				return pool.shutdownNow();
@@ -134,19 +153,29 @@ public class ActorCluster implements ClusterTerminator {
 	 * { <br>
 	 * "node1" : [ActorMessage(msg = "msg1"),ActorMessage(msg = "msg2")], <br>
 	 * "node2" : [ActorMessage(msg = 5),ActorMessage(msg = 382)], <br>
-	 * "pool" : [Callable(...),Callable(...)], <br>
 	 * <br>
 	 * } <br>
 	 */
 	@Override
-	public Map<String, List<?>> terminateCluster() {
+	public Map<String, List<?>> terminateCluster(boolean isPermenent) {
 		Map<String, List<?>> result = null;
 		try {
+			// aborting thread pool tasks triggers interruption to related thread.
+			// once a task is aborted while it's executed by the pool, we try to add the
+			// task to the end of the queue
+			// this process is about saving currently executing task.
+			abortThreadPoolTasks();
+
+			// in order to propogate trigger effect amongs other threads we wait few ms.
+			Thread.sleep(5);
+
+			// and collect the queue values.
 			result = this.router.terminateRouter();
-			result.put(ActorCluster.Fields.pool, terminateThreadPool());
 		} catch (Exception e) {
 			e.printStackTrace();
 		} finally {
+			if (isPermenent)
+				terminateThreadPool();
 			this.cb.setStatus(Status.PASSIVE);
 			System.out.println(terminatedMessage);
 		}

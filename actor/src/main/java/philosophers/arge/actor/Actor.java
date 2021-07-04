@@ -16,6 +16,7 @@ import lombok.experimental.Accessors;
 import lombok.experimental.FieldNameConstants;
 import philosophers.arge.actor.ControlBlock.Status;
 import philosophers.arge.actor.annotations.GuardedBy;
+import philosophers.arge.actor.annotations.Immutable;
 import philosophers.arge.actor.annotations.NotThreadSafe;
 import philosophers.arge.actor.annotations.ThreadSafe;
 import philosophers.arge.actor.divisionstrategies.DivisionStrategy;
@@ -48,6 +49,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 
 	@Exclude
 	@Setter(value = AccessLevel.PRIVATE)
+	@Getter(value = AccessLevel.PRIVATE)
 	private RouterNode router;
 
 	/**
@@ -89,8 +91,8 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 	}
 
 	private void init() {
+		this.cb = ControlBlockFactory.createCb(ActorType.WORKER);
 		this.queueLock = new ReentrantLock(true);
-		this.cb = new ControlBlock(ActorType.WORKER, Status.PASSIVE, true);
 		this.queue = new LinkedList<>();
 		this.isNotified = false;
 	}
@@ -114,19 +116,22 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 		return result;
 	}
 
+	@Immutable
 	@NotThreadSafe
 	public final int getQueueSize() {
 		return getQueue().size();
 	}
 
+	@Immutable
 	@NotThreadSafe
 	public final boolean isQueueEmpty() {
 		return getQueue().isEmpty();
 	}
 
+	@Immutable
 	@ThreadSafe
 	@GuardedBy(Actor.Fields.queueLock)
-	public final int getQueueSize_locked() {
+	public final int getQueueSizeLocked() {
 		queueLock.lock();
 		try {
 			return getQueue().size();
@@ -136,9 +141,10 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 
 	}
 
+	@Immutable
 	@ThreadSafe
 	@GuardedBy(Actor.Fields.queueLock)
-	public final boolean isQueueEmpty_locked() {
+	public final boolean isQueueEmptyLocked() {
 		queueLock.lock();
 		try {
 			return getQueue().isEmpty();
@@ -155,6 +161,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 	 * 
 	 * @param message
 	 */
+	@Immutable
 	public final void load(ActorMessage<T> message) {
 		if (divisionStrategy.isConditionValid(this)) {
 			divisionStrategy.executeLoadingStrategy(this, Arrays.asList(message));
@@ -171,6 +178,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 	 * @param messageList
 	 */
 
+	@Immutable
 	public final void loadAll(List<ActorMessage<T>> messageList) {
 		if (divisionStrategy.isConditionValid(this)) {
 			divisionStrategy.executeLoadingStrategy(this, messageList);
@@ -189,6 +197,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 	 * 
 	 * @param messageList
 	 */
+	@Immutable
 	public final void sendAll(List<ActorMessage<T>> messageList) {
 		loadAll(messageList);
 		sendExecutionRequest();
@@ -200,6 +209,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 	 * 
 	 * @param message
 	 */
+	@Immutable
 	@ThreadSafe
 	@GuardedBy(Actor.Fields.queueLock)
 	public final void sendByLocking(ActorMessage<T> message) {
@@ -222,6 +232,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 	 * 
 	 * @param messageList
 	 */
+	@Immutable
 	@ThreadSafe
 	@GuardedBy(Actor.Fields.queueLock)
 	public final void sendAllByLocking(List<ActorMessage<T>> messageList) {
@@ -272,6 +283,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 	 * 
 	 * @return
 	 */
+	@Immutable
 	@ThreadSafe
 	@GuardedBy(Actor.Fields.queueLock)
 	private final ActorMessage<T> deq() {
@@ -290,6 +302,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 	 * 
 	 * @return {@code Actor}
 	 */
+	@Immutable
 	private final Actor<T> initChildActor(Actor<T> node) {
 		this.router.incrementActorCount(node.getTopic());
 		node.getCb().setIsRoot(false);
@@ -303,6 +316,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 	 * 
 	 * @return
 	 */
+	@Immutable
 	public final Actor<T> fetchChildActor() {
 		if (childActor != null)
 			return childActor;
@@ -332,8 +346,18 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 	@Override
 	public Object call() throws Exception {
 		try {
-			while (isProcessingAvailable())
-				operate(deq());
+			ActorMessage<T> msg = null;
+			while (isProcessingAvailable()) {
+				msg = deq();
+				operate(msg);
+			}
+			if (Thread.currentThread().isInterrupted()) {
+				System.out.println("interrupted!");
+				// if the current thread is interrupted, then take the currently executing tasks
+				// and re-add the queue to return with waiting jobs
+				load(msg);
+				Thread.currentThread().interrupted();
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -349,7 +373,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 	 * @return
 	 */
 	private boolean isProcessingAvailable() {
-		return !getQueue().isEmpty() && Status.ACTIVE.equals(cb.getStatus());
+		return !getQueue().isEmpty() && Status.ACTIVE.equals(cb.getStatus()) && !Thread.currentThread().isInterrupted();
 	}
 
 	/**
