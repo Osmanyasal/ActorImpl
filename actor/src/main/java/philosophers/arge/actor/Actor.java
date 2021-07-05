@@ -97,6 +97,10 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 		this.isNotified = false;
 	}
 
+	public Actor<?> getRootActor(String topic) {
+		return this.router.getRootActor(topic);
+	}
+
 	/**
 	 * This is a basic snapshoot of the current root-child family. <br>
 	 * after calling this method the active node count both might be increased or

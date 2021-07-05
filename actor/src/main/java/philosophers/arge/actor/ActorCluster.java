@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -34,7 +35,6 @@ public class ActorCluster implements ClusterTerminator {
 	private RouterNode router;
 	private Object gateway;
 
-	@Exclude
 	private Map<String, List<Future<?>>> futures;
 
 	private TerminationTime terminationTime;
@@ -123,7 +123,6 @@ public class ActorCluster implements ClusterTerminator {
 	@GuardedBy(ActorCluster.Fields.poolLock)
 	public void abortThreadPoolTasks() throws InterruptedException {
 		poolLock.lock();
-		System.out.println("aborting thread pool tasks");
 		try {
 			for (String key : futures.keySet()) {
 				futures.get(key).forEach(x -> x.cancel(true));
@@ -157,7 +156,7 @@ public class ActorCluster implements ClusterTerminator {
 	 * } <br>
 	 */
 	@Override
-	public Map<String, List<?>> terminateCluster(boolean isPermenent) {
+	public Map<String, List<?>> terminateCluster(boolean isPermenent, boolean showInfo) {
 		Map<String, List<?>> result = null;
 		try {
 			// aborting thread pool tasks triggers interruption to related thread.
@@ -177,27 +176,48 @@ public class ActorCluster implements ClusterTerminator {
 			if (isPermenent)
 				terminateThreadPool();
 			this.cb.setStatus(Status.PASSIVE);
-			System.out.println(terminatedMessage);
+			if (showInfo)
+				System.out.println(terminatedMessage);
 		}
 		return result;
 	}
 
 	@Immutable
-	// TODO:Bitip bitmediği bilgisi root dugumlerden sorulsun
-	public final void waitForTermination() throws InterruptedException {
-		Collection<List<Future<?>>> values = getFutures().values();
-		while (values.parallelStream().anyMatch(x -> x.stream().anyMatch(m -> !m.isDone())))
-			Thread.sleep(7);
-		System.out.println("All tasks are done!");
+	public final void waitForTermination(boolean showInfo) throws InterruptedException {
+
+		ArrayList<String> allTopics = new ArrayList<>(router.getAllTopics());
+		for (int i = 0; i < allTopics.size(); i++) {
+			if (!waitForTermination(allTopics.get(i), showInfo))
+				i--;
+		}
+		if (showInfo)
+			System.out.println("All tasks are done!");
 		System.gc();
 	}
 
 	@Immutable
-	public final void waitForTermination(String topic) throws InterruptedException {
-		List<Future<?>> list = getFutures().get(topic);
-		while (list.parallelStream().anyMatch(x -> !x.isDone()))
-			Thread.sleep(7);
-		System.out.println(topic + " tasks are done!");
+	public final boolean waitForTermination(String topic, boolean showInfo) throws InterruptedException {
+		Actor<?> rootActor = router.getRootActor(topic);
+		if (rootActor == null)
+			return false;
+
+		boolean isAllTerminated = false;
+		Actor<?> temp;
+		do {
+			temp = rootActor;
+			while (temp != null) {
+				isAllTerminated = isAllTerminated || Status.PASSIVE.equals(temp.getCb().getStatus());
+				temp = temp.getChildActor();
+				if (isAllTerminated)
+					break;
+			}
+
+			// sleep for 5ms
+			Thread.sleep(5);
+		} while (!isAllTerminated);
+		if (showInfo)
+			System.out.println(topic + " tasks are done!");
 		System.gc();
+		return true;
 	}
 }
