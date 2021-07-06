@@ -1,12 +1,10 @@
 package philosophers.arge.actor;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -183,9 +181,11 @@ public class ActorCluster implements ClusterTerminator {
 	}
 
 	@Immutable
+	@NotThreadSafe
 	public final void waitForTermination(boolean showInfo) throws InterruptedException {
 
 		ArrayList<String> allTopics = new ArrayList<>(router.getAllTopics());
+		System.out.println(allTopics);
 		for (int i = 0; i < allTopics.size(); i++) {
 			if (!waitForTermination(allTopics.get(i), showInfo))
 				i--;
@@ -196,10 +196,15 @@ public class ActorCluster implements ClusterTerminator {
 	}
 
 	@Immutable
+
 	public final boolean waitForTermination(String topic, boolean showInfo) throws InterruptedException {
-		Actor<?> rootActor = router.getRootActor(topic);
-		if (rootActor == null)
+		if (!router.getAllTopics().stream().anyMatch(x -> x.equals(topic)))
 			return false;
+		Actor<?> rootActor = router.getRootActor(topic);
+		if (rootActor == null) {
+			Thread.sleep(5);// wait for 5 ms and call again.
+			return waitForTermination(topic, showInfo);
+		}
 
 		boolean isAllTerminated = false;
 		Actor<?> temp;
