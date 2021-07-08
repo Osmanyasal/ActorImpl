@@ -1,10 +1,13 @@
 package philosophers.arge.actor;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -55,7 +58,7 @@ public final class RouterNode implements RouterTerminator {
 	private void init(ActorCluster cluster) {
 		this.cb = ControlBlockFactory.createCb(ActorType.ROUTER);
 		this.cluster = cluster;
-		this.rootActors = new HashMap<>();
+		this.rootActors = new LinkedHashMap<>();
 		this.actorCountMap = new HashMap<>();
 		this.lock = new ReentrantReadWriteLock();
 	}
@@ -84,16 +87,24 @@ public final class RouterNode implements RouterTerminator {
 	public final Actor<?> getRootActor(String topic) {
 		lock.readLock().lock();
 		try {
-			return rootActors.containsKey(topic) ? rootActors.get(topic) : null;
+			return isTopicExists(topic) ? rootActors.get(topic) : null;
 		} finally {
 			lock.readLock().unlock();
 		}
 	}
 
 	@Immutable
+	@ThreadSafe
+	public final boolean isTopicExists(String topic) {
+		return rootActors.containsKey(topic);
+	}
+
+	@Immutable
 	@NotThreadSafe
-	public final Set<String> getAllTopics() {
-		return rootActors.keySet();
+	public final List<String> getAllTopics() {
+		List<String> result = new ArrayList<>(rootActors.keySet());
+		Collections.reverse(result);
+		return result;
 	}
 
 	@Immutable

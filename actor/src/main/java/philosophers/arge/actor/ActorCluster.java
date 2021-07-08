@@ -22,6 +22,7 @@ import philosophers.arge.actor.annotations.GuardedBy;
 import philosophers.arge.actor.annotations.Immutable;
 import philosophers.arge.actor.annotations.NotThreadSafe;
 import philosophers.arge.actor.annotations.ThreadSafe;
+import philosophers.arge.actor.exceptions.InvalidTopicException;
 
 @Data
 @Accessors(chain = true)
@@ -184,7 +185,7 @@ public class ActorCluster implements ClusterTerminator {
 	@NotThreadSafe
 	public final void waitForTermination(boolean showInfo) throws InterruptedException {
 
-		ArrayList<String> allTopics = new ArrayList<>(router.getAllTopics());
+		List<String> allTopics = router.getAllTopics();
 		System.out.println(allTopics);
 		for (int i = 0; i < allTopics.size(); i++) {
 			if (!waitForTermination(allTopics.get(i), showInfo))
@@ -196,27 +197,25 @@ public class ActorCluster implements ClusterTerminator {
 	}
 
 	@Immutable
-
 	public final boolean waitForTermination(String topic, boolean showInfo) throws InterruptedException {
-		if (!router.getAllTopics().stream().anyMatch(x -> x.equals(topic)))
-			return false;
-		Actor<?> rootActor = router.getRootActor(topic);
-		if (rootActor == null) {
-			Thread.sleep(5);// wait for 5 ms and call again.
-			return waitForTermination(topic, showInfo);
-		}
+		if (!router.isTopicExists(topic))
+			throw new InvalidTopicException(topic);
 
-		boolean isAllTerminated = false;
-		Actor<?> temp;
+		// why is this here?
+		Actor<?> rootActor = router.getRootActor(topic);
+//		if (rootActor == null) {
+//			Thread.sleep(5);// wait for 5 ms and call again.
+//			return waitForTermination(topic, showInfo);
+//		}
+		boolean isAllTerminated = true;
 		do {
+			isAllTerminated = true;
+			Actor<?> temp;
 			temp = rootActor;
 			while (temp != null) {
-				isAllTerminated = isAllTerminated || Status.PASSIVE.equals(temp.getCb().getStatus());
+				isAllTerminated = isAllTerminated && Status.PASSIVE.equals(temp.getCb().getStatus());
 				temp = temp.getChildActor();
-				if (isAllTerminated)
-					break;
 			}
-
 			// sleep for 5ms
 			Thread.sleep(5);
 		} while (!isAllTerminated);
