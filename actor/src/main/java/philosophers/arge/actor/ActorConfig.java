@@ -12,14 +12,17 @@ import philosophers.arge.actor.divisionstrategies.DivisionStrategy;
 @Data
 @Accessors(chain = true)
 @AllArgsConstructor
-public class ActorConfig<TMessage> {
+public class ActorConfig<T> {
 
 	@Setter(AccessLevel.PRIVATE)
-	private String topic;
+	private Topic topic;
 
 	@Setter(AccessLevel.PRIVATE)
 	private RouterNode router;
 
 	@Setter(AccessLevel.PRIVATE)
-	private DivisionStrategy<TMessage> divisionStrategy;
+	private DivisionStrategy<T> divisionStrategy;
+
+	@Setter(AccessLevel.PRIVATE)
+	private ActorPriority priority;
 }

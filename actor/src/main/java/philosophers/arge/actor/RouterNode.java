@@ -66,13 +66,13 @@ public final class RouterNode implements RouterTerminator {
 	@Immutable
 	@ThreadSafe
 	@GuardedBy(RouterNode.Fields.lock)
-	public final void addRootActor(String topic, Actor<?> node) {
-		if (rootActors.containsKey(topic))
+	public final void addRootActor(Topic topic, Actor<?> node) {
+		if (rootActors.containsKey(topic.getName()))
 			throw new OccupiedTopicException();
 		lock.writeLock().lock();
 		try {
 			incrementActorCount(topic);
-			rootActors.put(topic, node);
+			rootActors.put(topic.getName(), node);
 		} finally {
 			lock.writeLock().unlock();
 		}
@@ -109,11 +109,11 @@ public final class RouterNode implements RouterTerminator {
 
 	@Immutable
 	@NotThreadSafe
-	protected final void incrementActorCount(String topic) {
-		if (this.actorCountMap.containsKey(topic))
-			this.actorCountMap.put(topic, this.actorCountMap.get(topic) + 1);
+	protected final void incrementActorCount(Topic topic) {
+		if (this.actorCountMap.containsKey(topic.getName()))
+			this.actorCountMap.put(topic.getName(), this.actorCountMap.get(topic.getName()) + 1);
 		else
-			this.actorCountMap.put(topic, 1);
+			this.actorCountMap.put(topic.getName(), 1);
 	}
 
 	@Immutable

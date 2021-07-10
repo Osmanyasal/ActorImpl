@@ -6,7 +6,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
@@ -35,9 +34,7 @@ public class ActorCluster implements ClusterTerminator {
 	private Object gateway;
 
 	private Map<String, List<Future<?>>> futures;
-
 	private TerminationTime terminationTime;
-
 	private Lock poolLock;
 
 	@Exclude
@@ -61,7 +58,7 @@ public class ActorCluster implements ClusterTerminator {
 	@Immutable
 	private final void adjustConfigurations(ClusterConfig config) {
 		this.name = config.getName();
-		this.pool = Executors.newFixedThreadPool(config.getThreadCount());
+		this.pool = ExecutorFactory.getExecutor(config.getPoolType(), config.getThreadCount());
 		this.terminationTime = config.getTerminationTime();
 	}
 
@@ -97,12 +94,12 @@ public class ActorCluster implements ClusterTerminator {
 			node.getCb().setStatus(Status.ACTIVE);
 			poolLock.lock();
 			try {
-				if (futures.containsKey(node.getTopic()))
-					futures.get(node.getTopic()).add(pool.submit(node));
+				if (futures.containsKey(node.getTopic().getName()))
+					futures.get(node.getTopic().getName()).add(pool.submit(node));
 				else {
 					List<Future<?>> futureList = new ArrayList<>();
 					futureList.add(pool.submit(node));
-					futures.put(node.getTopic(), futureList);
+					futures.put(node.getTopic().getName(), futureList);
 				}
 			} finally {
 				poolLock.unlock();
@@ -188,8 +185,7 @@ public class ActorCluster implements ClusterTerminator {
 		List<String> allTopics = router.getAllTopics();
 		System.out.println(allTopics);
 		for (int i = 0; i < allTopics.size(); i++) {
-			if (!waitForTermination(allTopics.get(i), showInfo))
-				i--;
+			waitForTermination(allTopics.get(i), showInfo);
 		}
 		if (showInfo)
 			System.out.println("All tasks are done!");
@@ -203,10 +199,6 @@ public class ActorCluster implements ClusterTerminator {
 
 		// why is this here?
 		Actor<?> rootActor = router.getRootActor(topic);
-//		if (rootActor == null) {
-//			Thread.sleep(5);// wait for 5 ms and call again.
-//			return waitForTermination(topic, showInfo);
-//		}
 		boolean isAllTerminated = true;
 		do {
 			isAllTerminated = true;

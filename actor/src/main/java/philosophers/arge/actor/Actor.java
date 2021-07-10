@@ -35,13 +35,16 @@ import philosophers.arge.actor.divisionstrategies.DivisionStrategy;
 @Data
 @Accessors(chain = true)
 @FieldNameConstants
-public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
+public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T>, Comparable<Actor<T>> {
 
 	@Setter(value = AccessLevel.PRIVATE)
 	private ControlBlock cb;
 
 	@Setter(value = AccessLevel.PRIVATE)
-	private String topic;
+	private Topic topic;
+
+	@Setter(value = AccessLevel.PRIVATE)
+	private ActorPriority priority;
 
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
@@ -70,6 +73,11 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 
 	private DivisionStrategy<T> divisionStrategy;
 
+	@Override
+	public final int compareTo(Actor<T> o) {
+		return Integer.compare(getPriority().priority(), o.getPriority().priority());
+	}
+
 	/**
 	 * Every actor object must have a topic which defines the job they do. And every
 	 * actor must have a pointer to a router. by default we use the ActorCluster's
@@ -88,6 +96,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 		this.topic = config.getTopic();
 		this.router = config.getRouter();
 		this.divisionStrategy = config.getDivisionStrategy();
+		this.priority = config.getPriority();
 	}
 
 	private void init() {
@@ -95,6 +104,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T> {
 		this.queueLock = new ReentrantLock(true);
 		this.queue = new LinkedList<>();
 		this.isNotified = false;
+
 	}
 
 	public Actor<?> getRootActor(String topic) {
