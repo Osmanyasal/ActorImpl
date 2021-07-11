@@ -1,7 +1,5 @@
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)<br>
-<img src='https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=java&logoColor=white'></img><br>
-[🤜🤛 Group]
-[✏ Contribute](#-contribute-)
+<img src='https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=java&logoColor=white'></img> <br>
 
 # J-NPCU <h4> (Java - Node Based Parallel Computing Units)</h4>
 
