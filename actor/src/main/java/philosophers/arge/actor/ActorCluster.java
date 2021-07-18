@@ -1,13 +1,11 @@
 package philosophers.arge.actor;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
@@ -17,12 +15,13 @@ import lombok.Data;
 import lombok.ToString.Exclude;
 import lombok.experimental.Accessors;
 import lombok.experimental.FieldNameConstants;
-import philosophers.arge.actor.ClusterConfig.TerminationTime;
 import philosophers.arge.actor.ControlBlock.Status;
 import philosophers.arge.actor.annotations.GuardedBy;
 import philosophers.arge.actor.annotations.Immutable;
 import philosophers.arge.actor.annotations.NotThreadSafe;
 import philosophers.arge.actor.annotations.ThreadSafe;
+import philosophers.arge.actor.configs.ClusterConfig;
+import philosophers.arge.actor.exceptions.InvalidTopicException;
 
 @Data
 @Accessors(chain = true)
@@ -34,11 +33,7 @@ public class ActorCluster implements ClusterTerminator {
 	private RouterNode router;
 	private Object gateway;
 
-	@Exclude
 	private Map<String, List<Future<?>>> futures;
-
-	private TerminationTime terminationTime;
-
 	private Lock poolLock;
 
 	@Exclude
@@ -53,7 +48,6 @@ public class ActorCluster implements ClusterTerminator {
 
 	@Immutable
 	private final void init() {
-		this.cb = new ControlBlock(ActorType.CLUSTER, Status.ACTIVE, true);
 		this.futures = new HashMap<>();
 		this.poolLock = new ReentrantLock();
 		this.router = new RouterNode(this);
@@ -61,9 +55,9 @@ public class ActorCluster implements ClusterTerminator {
 
 	@Immutable
 	private final void adjustConfigurations(ClusterConfig config) {
+		this.cb = new ControlBlock(config.isDeamon() ? ActorType.DEAMON : ActorType.CLUSTER, Status.ACTIVE, true);
 		this.name = config.getName();
-		this.pool = Executors.newFixedThreadPool(config.getThreadCount());
-		this.terminationTime = config.getTerminationTime();
+		this.pool = ExecutorFactory.getExecutor(config.getPoolType(), config.getThreadCount());
 	}
 
 	@Immutable
@@ -98,12 +92,12 @@ public class ActorCluster implements ClusterTerminator {
 			node.getCb().setStatus(Status.ACTIVE);
 			poolLock.lock();
 			try {
-				if (futures.containsKey(node.getTopic()))
-					futures.get(node.getTopic()).add(pool.submit(node));
+				if (futures.containsKey(node.getTopic().getName()))
+					futures.get(node.getTopic().getName()).add(pool.submit(node));
 				else {
 					List<Future<?>> futureList = new ArrayList<>();
 					futureList.add(pool.submit(node));
-					futures.put(node.getTopic(), futureList);
+					futures.put(node.getTopic().getName(), futureList);
 				}
 			} finally {
 				poolLock.unlock();
@@ -123,7 +117,6 @@ public class ActorCluster implements ClusterTerminator {
 	@GuardedBy(ActorCluster.Fields.poolLock)
 	public void abortThreadPoolTasks() throws InterruptedException {
 		poolLock.lock();
-		System.out.println("aborting thread pool tasks");
 		try {
 			for (String key : futures.keySet()) {
 				futures.get(key).forEach(x -> x.cancel(true));
@@ -157,12 +150,12 @@ public class ActorCluster implements ClusterTerminator {
 	 * } <br>
 	 */
 	@Override
-	public Map<String, List<?>> terminateCluster(boolean isPermenent) {
+	public Map<String, List<?>> terminateCluster(boolean isPermenent, boolean showInfo) {
 		Map<String, List<?>> result = null;
 		try {
 			// aborting thread pool tasks triggers interruption to related thread.
 			// once a task is aborted while it's executed by the pool, we try to add the
-			// task to the end of the queue
+			// task to the end of the queue.
 			// this process is about saving currently executing task.
 			abortThreadPoolTasks();
 
@@ -177,27 +170,47 @@ public class ActorCluster implements ClusterTerminator {
 			if (isPermenent)
 				terminateThreadPool();
 			this.cb.setStatus(Status.PASSIVE);
-			System.out.println(terminatedMessage);
+			if (showInfo)
+				System.out.println(terminatedMessage);
 		}
 		return result;
 	}
 
 	@Immutable
-	// TODO:Bitip bitmediği bilgisi root dugumlerden sorulsun
-	public final void waitForTermination() throws InterruptedException {
-		Collection<List<Future<?>>> values = getFutures().values();
-		while (values.parallelStream().anyMatch(x -> x.stream().anyMatch(m -> !m.isDone())))
-			Thread.sleep(7);
-		System.out.println("All tasks are done!");
+	@NotThreadSafe
+	public final void waitForTermination(boolean showInfo) throws Exception {
+
+		List<String> allTopics = router.getAllTopics();
+		System.out.println(allTopics);
+		for (int i = 0; i < allTopics.size(); i++) {
+			waitForTermination(allTopics.get(i), showInfo);
+		}
+		if (showInfo)
+			System.out.println("All tasks are done!");
 		System.gc();
 	}
 
 	@Immutable
-	public final void waitForTermination(String topic) throws InterruptedException {
-		List<Future<?>> list = getFutures().get(topic);
-		while (list.parallelStream().anyMatch(x -> !x.isDone()))
-			Thread.sleep(7);
-		System.out.println(topic + " tasks are done!");
+	public final boolean waitForTermination(String topic, boolean showInfo) throws Exception {
+		if (!router.isTopicExists(topic))
+			throw new InvalidTopicException(topic);
+
+		Actor<?> rootActor = router.getRootActor(topic);
+		boolean isAllTerminated = true;
+		do {
+			isAllTerminated = true;
+			Actor<?> temp;
+			temp = rootActor;
+			while (temp != null) {
+				isAllTerminated = isAllTerminated && Status.PASSIVE.equals(temp.getCb().getStatus());
+				temp = temp.getChildActor();
+			}
+			// sleep for 5ms
+			Thread.sleep(5);
+		} while (!isAllTerminated);
+		if (showInfo)
+			System.out.println(topic + " tasks are done!");
 		System.gc();
+		return true;
 	}
 }

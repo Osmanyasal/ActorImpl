@@ -1,10 +1,15 @@
 package philosophers.arge.actor;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import org.springframework.util.CollectionUtils;
 
 import lombok.AccessLevel;
 import lombok.Data;
@@ -53,7 +58,7 @@ public final class RouterNode implements RouterTerminator {
 	private void init(ActorCluster cluster) {
 		this.cb = ControlBlockFactory.createCb(ActorType.ROUTER);
 		this.cluster = cluster;
-		this.rootActors = new HashMap<>();
+		this.rootActors = new LinkedHashMap<>();
 		this.actorCountMap = new HashMap<>();
 		this.lock = new ReentrantReadWriteLock();
 	}
@@ -61,13 +66,13 @@ public final class RouterNode implements RouterTerminator {
 	@Immutable
 	@ThreadSafe
 	@GuardedBy(RouterNode.Fields.lock)
-	public final void addRootActor(String topic, Actor<?> node) {
-		if (rootActors.containsKey(topic))
+	public final void addRootActor(Topic topic, Actor<?> node) {
+		if (rootActors.containsKey(topic.getName()))
 			throw new OccupiedTopicException();
 		lock.writeLock().lock();
 		try {
 			incrementActorCount(topic);
-			rootActors.put(topic, node);
+			rootActors.put(topic.getName(), node);
 		} finally {
 			lock.writeLock().unlock();
 		}
@@ -82,19 +87,33 @@ public final class RouterNode implements RouterTerminator {
 	public final Actor<?> getRootActor(String topic) {
 		lock.readLock().lock();
 		try {
-			return rootActors.containsKey(topic) ? rootActors.get(topic) : null;
+			return isTopicExists(topic) ? rootActors.get(topic) : null;
 		} finally {
 			lock.readLock().unlock();
 		}
 	}
 
 	@Immutable
+	@ThreadSafe
+	public final boolean isTopicExists(String topic) {
+		return rootActors.containsKey(topic);
+	}
+
+	@Immutable
 	@NotThreadSafe
-	protected final void incrementActorCount(String topic) {
-		if (this.actorCountMap.containsKey(topic))
-			this.actorCountMap.put(topic, this.actorCountMap.get(topic) + 1);
+	public final List<String> getAllTopics() {
+		List<String> result = new ArrayList<>(rootActors.keySet());
+		Collections.reverse(result);
+		return result;
+	}
+
+	@Immutable
+	@NotThreadSafe
+	protected final void incrementActorCount(Topic topic) {
+		if (this.actorCountMap.containsKey(topic.getName()))
+			this.actorCountMap.put(topic.getName(), this.actorCountMap.get(topic.getName()) + 1);
 		else
-			this.actorCountMap.put(topic, 1);
+			this.actorCountMap.put(topic.getName(), 1);
 	}
 
 	@Immutable
@@ -123,6 +142,27 @@ public final class RouterNode implements RouterTerminator {
 		rootActors.clear();
 		actorCountMap.clear();
 		this.cb.setStatus(Status.PASSIVE);
+		return waitingJobs;
+	}
+
+	public final void waitForTermination(final List<String> topicList, boolean showInfo) throws Exception {
+		if (CollectionUtils.isEmpty(topicList))
+			return;
+		for (int i = 0; i < topicList.size(); i++) {
+			cluster.waitForTermination(topicList.get(i), showInfo);
+		}
+	}
+
+	/**
+	 * Terminates the given topic with all its nodes.
+	 * 
+	 * @param topic
+	 * @return
+	 */
+	@NotThreadSafe
+	public Map<String, List<?>> terminateTopic(final Topic topic) {
+		Map<String, List<?>> waitingJobs = new HashMap<>();
+		waitingJobs.put(topic.getName(), rootActors.get(topic.getName()).terminate());
 		return waitingJobs;
 	}
 }

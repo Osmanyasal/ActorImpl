@@ -1,7 +1,8 @@
 package philosophers.arge.actor;
 
+import java.util.UUID;
+
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Setter;
 import lombok.experimental.Accessors;
@@ -10,8 +11,15 @@ import philosophers.arge.actor.annotations.Immutable;
 @Immutable
 @Data
 @Accessors(chain = true)
-@AllArgsConstructor
 public class ActorMessage<T> {
 	@Setter(AccessLevel.PRIVATE)
+	private String id;
+
+	@Setter(AccessLevel.PRIVATE)
 	private T message;
+
+	public ActorMessage(T message) {
+		this.id = UUID.randomUUID().toString();
+		this.message = message;
+	}
 }
