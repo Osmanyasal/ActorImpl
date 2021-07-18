@@ -21,22 +21,19 @@ public final class Utils {
 		colorList.add(Color.BLACK);
 		colorList.add(Color.BLUE);
 		colorList.add(Color.CYAN);
-		colorList.add(Color.DARK_GRAY);
 		colorList.add(Color.GRAY);
 		colorList.add(Color.GREEN);
-		colorList.add(Color.LIGHT_GRAY);
 		colorList.add(Color.MAGENTA);
 		colorList.add(Color.ORANGE);
 		colorList.add(Color.PINK);
 		colorList.add(Color.RED);
-		colorList.add(Color.YELLOW);
 	}
 
-	public static final XYSeries toXYDataSet(String name, Map<Integer, Integer> values) {
+	public static final XYSeries toXYDataSet(String name, Map<Double, Double> values) {
 		XYSeries s1 = new XYSeries(name);
-		Iterator<Integer> iterator = values.keySet().iterator();
+		Iterator<Double> iterator = values.keySet().iterator();
 		while (iterator.hasNext()) {
-			Integer key = iterator.next();
+			Double key = iterator.next();
 			s1.add(key, values.get(key));
 		}
 		return s1;

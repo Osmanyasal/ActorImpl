@@ -22,9 +22,9 @@ public class LineChart extends JFrame {
 	private static final long serialVersionUID = -1429370178194424829L;
 	private static final String PERFORMANCE_METRICS = "Performance Metrics";
 
-	public LineChart(XYSeries... dataSet) {
+	public LineChart(String xName, String yName, XYSeries... dataSet) {
 		super(PERFORMANCE_METRICS);
-		JFreeChart chart = createChart(dataSet.length, dataSet);
+		JFreeChart chart = createChart(xName, yName, dataSet.length, dataSet);
 		ChartPanel panel = new ChartPanel(chart);
 		panel.setPreferredSize(new Dimension(1000, 600));
 		setContentPane(panel);
@@ -37,10 +37,10 @@ public class LineChart extends JFrame {
 		return this;
 	}
 
-	private JFreeChart createChart(int dataSetLength, XYSeries... dataset) {
+	private JFreeChart createChart(String xName, String yName, int dataSetLength, XYSeries... dataset) {
 
-		JFreeChart chart = ChartFactory.createXYLineChart("", "X", "Y", Utils.convertXYSeriesListToCollection(dataset),
-				PlotOrientation.VERTICAL, true, true, false);
+		JFreeChart chart = ChartFactory.createXYLineChart("", xName, yName,
+				Utils.convertXYSeriesListToCollection(dataset), PlotOrientation.VERTICAL, true, true, false);
 		return basicChartCustomization(chart, dataSetLength);
 	}
 
