@@ -6,10 +6,10 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import org.springframework.util.CollectionUtils;
 
 import lombok.AccessLevel;
 import lombok.Data;
@@ -142,6 +142,27 @@ public final class RouterNode implements RouterTerminator {
 		rootActors.clear();
 		actorCountMap.clear();
 		this.cb.setStatus(Status.PASSIVE);
+		return waitingJobs;
+	}
+
+	public final void waitForTermination(final List<String> topicList, boolean showInfo) throws Exception {
+		if (CollectionUtils.isEmpty(topicList))
+			return;
+		for (int i = 0; i < topicList.size(); i++) {
+			cluster.waitForTermination(topicList.get(i), showInfo);
+		}
+	}
+
+	/**
+	 * Terminates the given topic with all its nodes.
+	 * 
+	 * @param topic
+	 * @return
+	 */
+	@NotThreadSafe
+	public Map<String, List<?>> terminateTopic(final Topic topic) {
+		Map<String, List<?>> waitingJobs = new HashMap<>();
+		waitingJobs.put(topic.getName(), rootActors.get(topic.getName()).terminate());
 		return waitingJobs;
 	}
 }

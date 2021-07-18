@@ -1,4 +1,4 @@
-package philosophers.arge.actor;
+package philosophers.arge.actor.configs;
 
 import java.util.UUID;
 
@@ -11,24 +11,21 @@ import philosophers.arge.actor.ExecutorFactory.ThreadPoolTypes;
 @Accessors(chain = true)
 @AllArgsConstructor
 public class ClusterConfig {
-	public enum TerminationTime {
-		WHEN_EXECUTION_IS_FINISHED, ON_DEMAND, NEVER,
-	}
 
 	private String name;
 	private int threadCount;
 	private ThreadPoolTypes poolType;
-	private TerminationTime terminationTime;
+	private boolean isDeamon;
 
 	/**
 	 * 
 	 * @param poolType can be omitted by default creates
 	 *                 {@code FixedSizedThreadPool} with default thread count
 	 */
-	public ClusterConfig(ThreadPoolTypes poolType) {
+	public ClusterConfig(ThreadPoolTypes poolType, boolean isDeamon) {
 		this.name = UUID.randomUUID().toString();
 		this.threadCount = Runtime.getRuntime().availableProcessors() * 2;
-		this.terminationTime = TerminationTime.ON_DEMAND;
 		this.poolType = poolType != null ? poolType : ThreadPoolTypes.FIXED_SIZED;
+		this.isDeamon = isDeamon;
 	}
 }

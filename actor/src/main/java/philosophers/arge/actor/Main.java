@@ -1,46 +1,58 @@
 package philosophers.arge.actor;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.PriorityBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
-import lombok.Data;
-import lombok.experimental.Accessors;
+import philosophers.arge.actor.ExecutorFactory.ThreadPoolTypes;
+import philosophers.arge.actor.configs.ActorConfig;
+import philosophers.arge.actor.configs.ClusterConfig;
+import philosophers.arge.actor.divisionstrategies.NumberBasedDivison;
 
 public class Main {
 
 	public static void main(String[] args) throws InterruptedException {
-		actorExample();
 	}
 
 	public static void actorExample() throws InterruptedException {
-		ExecutorService pool = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new PriorityBlockingQueue<>());
-		pool.submit(new Temp(ActorPriority.DEFAULT));
-		pool.submit(new Temp(ActorPriority.LOW));
-		pool.submit(new Temp(ActorPriority.MEDIUM));
-		pool.submit(new Temp(ActorPriority.HIGH));
-		pool.submit(new Temp(ActorPriority.MAX));
+		ActorCluster cluster = new ActorCluster(new ClusterConfig(ThreadPoolTypes.FIXED_SIZED, false));
+		Temp temp = new Temp(new ActorConfig<String>(new Topic(Temp.class.getSimpleName()), cluster.getRouter(),
+				new NumberBasedDivison<String>(20l), ActorPriority.DEFAULT, null));
+		cluster.addRootActor(temp);
+
+		for (int i = 1; i < 1000; i++) {
+			temp.load(new ActorMessage<>("" + i));
+		}
+		temp.executeNodeStack();
+		try {
+			cluster.waitForTermination(true);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 }
 
-@Data
-@Accessors(chain = true)
-class Temp implements Comparable<Temp>, Runnable {
-	ActorPriority priority;
+class Temp extends Actor<String> {
+	private ActorConfig<String> config;
 
-	public Temp(ActorPriority priority) {
-		this.priority = priority;
+	protected Temp(ActorConfig<String> config) {
+		super(config);
+		this.config = config;
 	}
 
 	@Override
-	public int compareTo(Temp o) {
-		return Integer.compare(getPriority().priority(), o.getPriority().priority());
+	public void operate(ActorMessage<String> msg) {
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		System.out.println("message : " + msg.getMessage());
+		if (msg.getMessage().equals("600")) {
+			System.out.println("600 was found in -> " + getCb().getId().substring(0, 6) + " terminating all nodes!!");
+			terminateNodeStack();
+		}
 	}
 
 	@Override
-	public void run() {
-		System.out.println("this is :" + priority.priority());
+	public Actor<String> generateChildActor() {
+		return new Temp(config);
 	}
 
 }

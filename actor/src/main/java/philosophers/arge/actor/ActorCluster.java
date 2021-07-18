@@ -15,12 +15,12 @@ import lombok.Data;
 import lombok.ToString.Exclude;
 import lombok.experimental.Accessors;
 import lombok.experimental.FieldNameConstants;
-import philosophers.arge.actor.ClusterConfig.TerminationTime;
 import philosophers.arge.actor.ControlBlock.Status;
 import philosophers.arge.actor.annotations.GuardedBy;
 import philosophers.arge.actor.annotations.Immutable;
 import philosophers.arge.actor.annotations.NotThreadSafe;
 import philosophers.arge.actor.annotations.ThreadSafe;
+import philosophers.arge.actor.configs.ClusterConfig;
 import philosophers.arge.actor.exceptions.InvalidTopicException;
 
 @Data
@@ -34,7 +34,6 @@ public class ActorCluster implements ClusterTerminator {
 	private Object gateway;
 
 	private Map<String, List<Future<?>>> futures;
-	private TerminationTime terminationTime;
 	private Lock poolLock;
 
 	@Exclude
@@ -49,7 +48,6 @@ public class ActorCluster implements ClusterTerminator {
 
 	@Immutable
 	private final void init() {
-		this.cb = new ControlBlock(ActorType.CLUSTER, Status.ACTIVE, true);
 		this.futures = new HashMap<>();
 		this.poolLock = new ReentrantLock();
 		this.router = new RouterNode(this);
@@ -57,9 +55,9 @@ public class ActorCluster implements ClusterTerminator {
 
 	@Immutable
 	private final void adjustConfigurations(ClusterConfig config) {
+		this.cb = new ControlBlock(config.isDeamon() ? ActorType.DEAMON : ActorType.CLUSTER, Status.ACTIVE, true);
 		this.name = config.getName();
 		this.pool = ExecutorFactory.getExecutor(config.getPoolType(), config.getThreadCount());
-		this.terminationTime = config.getTerminationTime();
 	}
 
 	@Immutable
@@ -157,7 +155,7 @@ public class ActorCluster implements ClusterTerminator {
 		try {
 			// aborting thread pool tasks triggers interruption to related thread.
 			// once a task is aborted while it's executed by the pool, we try to add the
-			// task to the end of the queue
+			// task to the end of the queue.
 			// this process is about saving currently executing task.
 			abortThreadPoolTasks();
 
@@ -180,7 +178,7 @@ public class ActorCluster implements ClusterTerminator {
 
 	@Immutable
 	@NotThreadSafe
-	public final void waitForTermination(boolean showInfo) throws InterruptedException {
+	public final void waitForTermination(boolean showInfo) throws Exception {
 
 		List<String> allTopics = router.getAllTopics();
 		System.out.println(allTopics);
@@ -193,11 +191,10 @@ public class ActorCluster implements ClusterTerminator {
 	}
 
 	@Immutable
-	public final boolean waitForTermination(String topic, boolean showInfo) throws InterruptedException {
+	public final boolean waitForTermination(String topic, boolean showInfo) throws Exception {
 		if (!router.isTopicExists(topic))
 			throw new InvalidTopicException(topic);
 
-		// why is this here?
 		Actor<?> rootActor = router.getRootActor(topic);
 		boolean isAllTerminated = true;
 		do {

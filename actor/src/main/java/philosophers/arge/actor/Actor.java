@@ -1,11 +1,15 @@
 package philosophers.arge.actor;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
+import org.springframework.util.CollectionUtils;
 
 import lombok.AccessLevel;
 import lombok.Data;
@@ -19,6 +23,7 @@ import philosophers.arge.actor.annotations.GuardedBy;
 import philosophers.arge.actor.annotations.Immutable;
 import philosophers.arge.actor.annotations.NotThreadSafe;
 import philosophers.arge.actor.annotations.ThreadSafe;
+import philosophers.arge.actor.configs.ActorConfig;
 import philosophers.arge.actor.divisionstrategies.DivisionStrategy;
 
 /**
@@ -31,7 +36,7 @@ import philosophers.arge.actor.divisionstrategies.DivisionStrategy;
  *
  * @param <T>
  */
-@NotThreadSafe
+@ThreadSafe
 @Data
 @Accessors(chain = true)
 @FieldNameConstants
@@ -73,6 +78,10 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T>, 
 
 	private DivisionStrategy<T> divisionStrategy;
 
+	@Setter(value = AccessLevel.PRIVATE)
+	@Getter(value = AccessLevel.PRIVATE)
+	private List<Actor<?>> waitList;
+
 	@Override
 	public final int compareTo(Actor<T> o) {
 		return Integer.compare(getPriority().priority(), o.getPriority().priority());
@@ -97,6 +106,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T>, 
 		this.router = config.getRouter();
 		this.divisionStrategy = config.getDivisionStrategy();
 		this.priority = config.getPriority();
+		this.waitList = config.getWaitList();
 	}
 
 	private void init() {
@@ -109,6 +119,14 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T>, 
 
 	public Actor<?> getRootActor(String topic) {
 		return this.router.getRootActor(topic);
+	}
+
+	@ThreadSafe
+	public final List<String> getWaitListTopics() {
+		List<String> result = new ArrayList<>();
+		if (!CollectionUtils.isEmpty(this.waitList))
+			this.waitList.stream().forEach((x) -> result.add(x.getTopic().getName()));
+		return result;
 	}
 
 	/**
@@ -344,6 +362,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T>, 
 	 * 
 	 */
 	public List<ActorMessage<T>> terminate() {
+		Thread.currentThread().interrupt();
 		this.cb.setStatus(Status.PASSIVE);
 		if (childActor != null) {
 			queue.addAll(childActor.terminate());
@@ -353,6 +372,10 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T>, 
 		return response;
 	}
 
+	public Map<String, List<?>> terminateNodeStack() {
+		return router.terminateTopic(topic);
+	}
+
 	/**
 	 * Once the node is sent to threadPool this method is called.<br>
 	 * you might want to override this method for advanced computations.
@@ -360,17 +383,12 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T>, 
 	@Override
 	public Object call() throws Exception {
 		try {
-			ActorMessage<T> msg = null;
+			router.waitForTermination(getWaitListTopics(), false);
 			while (isProcessingAvailable()) {
-				msg = deq();
-				operate(msg);
+				operate(deq());
 			}
-			if (Thread.currentThread().isInterrupted()) {
+			if (Thread.currentThread().interrupted()) {
 				System.out.println("interrupted!");
-				// if the current thread is interrupted, then take the currently executing tasks
-				// and re-add the queue to return with waiting jobs
-				load(msg);
-				Thread.currentThread().interrupted();
 			}
 		} catch (Exception e) {
 			e.printStackTrace();

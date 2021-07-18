@@ -17,7 +17,7 @@ import java.lang.annotation.Target;
  *
  */
 
-@Target({ FIELD, METHOD, CONSTRUCTOR, ElementType.ANNOTATION_TYPE })
+@Target({ FIELD, METHOD, CONSTRUCTOR, ElementType.ANNOTATION_TYPE, ElementType.TYPE })
 public @interface ThreadSafe {
 
 }
