@@ -11,7 +11,6 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import philosophers.arge.actor.annotations.ThreadSafe;
-import philosophers.arge.actor.terminators.Terminable;
 import philosophers.arge.actor.terminators.Terminate;
 
 /**
@@ -53,14 +52,14 @@ public class DelayedCache implements Cache, Terminate {
 
 	@Override
 	@ThreadSafe
-	public void add(String key, Object value, long periodInMillis) {
+	public void add(String key, Object value, long time, TimeUnit timeUnit) {
 		if (key == null) {
 			return;
 		}
 		if (value == null) {
 			cache.remove(key);
 		} else {
-			long expiryTime = System.currentTimeMillis() + periodInMillis;
+			long expiryTime = System.currentTimeMillis() + TimeUnit.MILLISECONDS.convert(time, timeUnit);
 			SoftReference<Object> reference = new SoftReference<>(value);
 			cache.put(key, reference);
 			cleaningUpQueue.put(new DelayedCacheObject(key, reference, expiryTime));

@@ -12,6 +12,7 @@ import java.lang.annotation.Target;
  * @author osmanyasal
  *
  */
+
 @Target({ FIELD, METHOD, CONSTRUCTOR, ElementType.ANNOTATION_TYPE, ElementType.TYPE })
 public @interface NotImplemented {
 

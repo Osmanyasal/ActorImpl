@@ -25,7 +25,7 @@ public class LineChart extends JFrame {
 
 	private static final long serialVersionUID = -1429370178194424829L;
 	private static final String PERFORMANCE_METRICS = "Performance Metrics";
- 
+
 	public LineChart(String xName, String yName, XYSeries... dataSet) {
 		super(PERFORMANCE_METRICS);
 		JFreeChart chart = createChart(xName, yName, dataSet.length, dataSet);
@@ -35,6 +35,7 @@ public class LineChart extends JFrame {
 		panel.setPreferredSize(
 				new Dimension((int) Math.ceil(size.getWidth() / 2), (int) Math.ceil(size.getHeight() / 2)));
 		setContentPane(panel);
+
 	}
 
 	public final LineChart draw() {
@@ -44,7 +45,6 @@ public class LineChart extends JFrame {
 	}
 
 	private JFreeChart createChart(String xName, String yName, int dataSetLength, XYSeries... dataset) {
-
 		JFreeChart chart = ChartFactory.createXYLineChart("", xName, yName,
 				Utils.convertXYSeriesListToCollection(dataset), PlotOrientation.VERTICAL, true, true, false);
 		return basicChartCustomization(chart, dataSetLength);
@@ -58,6 +58,8 @@ public class LineChart extends JFrame {
 			renderer.setSeriesPaint(i, Utils.getRandomColor());
 			renderer.setSeriesStroke(i, new BasicStroke(3f));
 		}
+ 
+		
 		// sets paint color for plot outlines
 		plot.setOutlinePaint(Color.BLACK);
 		plot.setOutlineStroke(new BasicStroke(2.0f));

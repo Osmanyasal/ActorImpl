@@ -23,6 +23,7 @@ import philosophers.arge.actor.annotations.GuardedBy;
 import philosophers.arge.actor.annotations.Immutable;
 import philosophers.arge.actor.annotations.NotThreadSafe;
 import philosophers.arge.actor.annotations.ThreadSafe;
+import philosophers.arge.actor.cache.Cache;
 import philosophers.arge.actor.configs.ActorConfig;
 import philosophers.arge.actor.divisionstrategies.DivisionStrategy;
 import philosophers.arge.actor.terminators.ActorTerminator;
@@ -120,6 +121,10 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T>, 
 
 	public Actor<?> getRootActor(String topic) {
 		return this.router.getRootActor(topic);
+	}
+
+	public Cache getCache() {
+		return getRouter().getDelayedCache();
 	}
 
 	@ThreadSafe
