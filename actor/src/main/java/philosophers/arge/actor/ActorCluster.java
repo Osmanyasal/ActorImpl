@@ -11,7 +11,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString.Exclude;
 import lombok.experimental.Accessors;
 import lombok.experimental.FieldNameConstants;
@@ -20,23 +23,43 @@ import philosophers.arge.actor.annotations.GuardedBy;
 import philosophers.arge.actor.annotations.Immutable;
 import philosophers.arge.actor.annotations.NotThreadSafe;
 import philosophers.arge.actor.annotations.ThreadSafe;
+import philosophers.arge.actor.cache.DelayedCache;
 import philosophers.arge.actor.configs.ClusterConfig;
 import philosophers.arge.actor.exceptions.InvalidTopicException;
+import philosophers.arge.actor.terminators.ClusterTerminator;
 
 @Data
 @Accessors(chain = true)
 @FieldNameConstants
 public class ActorCluster implements ClusterTerminator {
 	private final String terminatedMessage;
+
+	@Setter(AccessLevel.PRIVATE)
 	private String name;
+
+	@Setter(AccessLevel.PRIVATE)
 	private ControlBlock cb;
+
+	@Setter(AccessLevel.PRIVATE)
 	private RouterNode router;
+
+	@Setter(AccessLevel.PRIVATE)
+	@Getter(AccessLevel.PRIVATE)
 	private Object gateway;
 
+	@Setter(AccessLevel.PRIVATE)
+	@Getter(AccessLevel.PRIVATE)
 	private Map<String, List<Future<?>>> futures;
+
+	@Setter(AccessLevel.PRIVATE)
+	@Getter(AccessLevel.PRIVATE)
 	private Lock poolLock;
 
+	@Setter(AccessLevel.PRIVATE)
+	private DelayedCache cache;
+
 	@Exclude
+	@Setter(AccessLevel.PRIVATE)
 	private ExecutorService pool;
 
 	public ActorCluster(ClusterConfig config) {
@@ -51,6 +74,7 @@ public class ActorCluster implements ClusterTerminator {
 		this.futures = new HashMap<>();
 		this.poolLock = new ReentrantLock();
 		this.router = new RouterNode(this);
+		this.cache = new DelayedCache();
 	}
 
 	@Immutable
@@ -132,10 +156,11 @@ public class ActorCluster implements ClusterTerminator {
 		try {
 			pool.awaitTermination(1, TimeUnit.SECONDS);
 		} catch (InterruptedException e) {
-			e.printStackTrace();
+			// do nothing.
 		} finally {
-			if (!pool.isTerminated())
+			if (!pool.isTerminated()) {
 				return pool.shutdownNow();
+			}
 		}
 		return Collections.emptyList();
 	}
@@ -151,7 +176,7 @@ public class ActorCluster implements ClusterTerminator {
 	 */
 	@Override
 	public Map<String, List<?>> terminateCluster(boolean isPermenent, boolean showInfo) {
-		Map<String, List<?>> result = null;
+		Map<String, List<?>> result = new HashMap<>();
 		try {
 			// aborting thread pool tasks triggers interruption to related thread.
 			// once a task is aborted while it's executed by the pool, we try to add the
@@ -168,10 +193,12 @@ public class ActorCluster implements ClusterTerminator {
 			e.printStackTrace();
 		} finally {
 			if (isPermenent)
-				terminateThreadPool();
+				result.put("Pool_Waiting_Queue", terminateThreadPool());
 			this.cb.setStatus(Status.PASSIVE);
 			if (showInfo)
 				System.out.println(terminatedMessage);
+
+			System.gc();
 		}
 		return result;
 	}

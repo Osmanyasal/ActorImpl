@@ -25,6 +25,7 @@ import philosophers.arge.actor.annotations.NotThreadSafe;
 import philosophers.arge.actor.annotations.ThreadSafe;
 import philosophers.arge.actor.configs.ActorConfig;
 import philosophers.arge.actor.divisionstrategies.DivisionStrategy;
+import philosophers.arge.actor.terminators.ActorTerminator;
 
 /**
  * Actors itself is {@code NotThreadSafe} because every actor has it's data to

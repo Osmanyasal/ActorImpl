@@ -23,7 +23,9 @@ import philosophers.arge.actor.annotations.GuardedBy;
 import philosophers.arge.actor.annotations.Immutable;
 import philosophers.arge.actor.annotations.NotThreadSafe;
 import philosophers.arge.actor.annotations.ThreadSafe;
+import philosophers.arge.actor.cache.Cache;
 import philosophers.arge.actor.exceptions.OccupiedTopicException;
+import philosophers.arge.actor.terminators.RouterTerminator;
 
 @Data
 @Accessors(chain = true)
@@ -121,6 +123,12 @@ public final class RouterNode implements RouterTerminator {
 	@GuardedBy(ActorCluster.Fields.poolLock)
 	public final void executeNode(Actor<?> node) {
 		cluster.executeNode(node);
+	}
+
+	@Immutable
+	@ThreadSafe
+	public final Cache getDelayedCache() {
+		return cluster.getCache();
 	}
 
 	/**

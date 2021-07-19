@@ -1,4 +1,4 @@
-package philosophers.arge.actor;
+package philosophers.arge.actor.terminators;
 
 /**
  * Marker interface
