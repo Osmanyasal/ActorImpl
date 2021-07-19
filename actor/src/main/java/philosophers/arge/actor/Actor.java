@@ -362,11 +362,11 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T>, 
 	 * {@code Status.PASSIVE}
 	 * 
 	 */
-	public List<ActorMessage<T>> terminate() {
+	public List<ActorMessage<T>> terminateActor() {
 		Thread.currentThread().interrupt();
 		this.cb.setStatus(Status.PASSIVE);
 		if (childActor != null) {
-			queue.addAll(childActor.terminate());
+			queue.addAll(childActor.terminateActor());
 		}
 		List<ActorMessage<T>> response = queue;
 		queue = new LinkedList<>();

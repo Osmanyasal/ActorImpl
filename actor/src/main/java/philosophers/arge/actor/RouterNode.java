@@ -145,7 +145,7 @@ public final class RouterNode implements RouterTerminator {
 	public Map<String, List<?>> terminateRouter() {
 		Map<String, List<?>> waitingJobs = new HashMap<>();
 		for (String key : rootActors.keySet()) {
-			waitingJobs.put(key, rootActors.get(key).terminate());
+			waitingJobs.put(key, rootActors.get(key).terminateActor());
 		}
 		rootActors.clear();
 		actorCountMap.clear();
@@ -170,7 +170,7 @@ public final class RouterNode implements RouterTerminator {
 	@NotThreadSafe
 	public Map<String, List<?>> terminateTopic(final Topic topic) {
 		Map<String, List<?>> waitingJobs = new HashMap<>();
-		waitingJobs.put(topic.getName(), rootActors.get(topic.getName()).terminate());
+		waitingJobs.put(topic.getName(), rootActors.get(topic.getName()).terminateActor());
 		return waitingJobs;
 	}
 }

@@ -12,6 +12,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import philosophers.arge.actor.annotations.ThreadSafe;
 import philosophers.arge.actor.terminators.Terminable;
+import philosophers.arge.actor.terminators.Terminate;
 
 /**
  * We can easily store some calculated operations results in order to reduce
@@ -21,7 +22,7 @@ import philosophers.arge.actor.terminators.Terminable;
  * @author osmanyasal
  *
  */
-public class DelayedCache implements Cache, Terminable {
+public class DelayedCache implements Cache, Terminate {
 
 	private final ConcurrentHashMap<String, SoftReference<Object>> cache = new ConcurrentHashMap<>();
 	private final DelayQueue<DelayedCacheObject> cleaningUpQueue = new DelayQueue<>();
@@ -90,6 +91,7 @@ public class DelayedCache implements Cache, Terminable {
 		return cache.size();
 	}
 
+	@Override
 	public void terminate() {
 		if (cleanerThread.isAlive())
 			cleanerThread.interrupt();
