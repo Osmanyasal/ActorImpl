@@ -3,6 +3,7 @@ package philosophers.arge.actor.visual;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Toolkit;
 
 import javax.swing.JFrame;
 
@@ -14,11 +15,14 @@ import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.data.xy.XYSeries;
 
+/**
+ * Used for drawing performance metrics.
+ * 
+ * @author osmanyasal
+ *
+ */
 public class LineChart extends JFrame {
 
-	/**
-	 * 
-	 */
 	private static final long serialVersionUID = -1429370178194424829L;
 	private static final String PERFORMANCE_METRICS = "Performance Metrics";
 
@@ -26,7 +30,10 @@ public class LineChart extends JFrame {
 		super(PERFORMANCE_METRICS);
 		JFreeChart chart = createChart(xName, yName, dataSet.length, dataSet);
 		ChartPanel panel = new ChartPanel(chart);
-		panel.setPreferredSize(new Dimension(1000, 600));
+		Dimension size = Toolkit.getDefaultToolkit().getScreenSize();
+		System.out.println(size);
+		panel.setPreferredSize(
+				new Dimension((int) Math.ceil(size.getWidth() / 2), (int) Math.ceil(size.getHeight() / 2)));
 		setContentPane(panel);
 
 	}
@@ -38,7 +45,6 @@ public class LineChart extends JFrame {
 	}
 
 	private JFreeChart createChart(String xName, String yName, int dataSetLength, XYSeries... dataset) {
-
 		JFreeChart chart = ChartFactory.createXYLineChart("", xName, yName,
 				Utils.convertXYSeriesListToCollection(dataset), PlotOrientation.VERTICAL, true, true, false);
 		return basicChartCustomization(chart, dataSetLength);
@@ -52,6 +58,8 @@ public class LineChart extends JFrame {
 			renderer.setSeriesPaint(i, Utils.getRandomColor());
 			renderer.setSeriesStroke(i, new BasicStroke(3f));
 		}
+ 
+		
 		// sets paint color for plot outlines
 		plot.setOutlinePaint(Color.BLACK);
 		plot.setOutlineStroke(new BasicStroke(2.0f));

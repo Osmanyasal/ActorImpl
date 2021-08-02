@@ -23,7 +23,9 @@ import philosophers.arge.actor.annotations.GuardedBy;
 import philosophers.arge.actor.annotations.Immutable;
 import philosophers.arge.actor.annotations.NotThreadSafe;
 import philosophers.arge.actor.annotations.ThreadSafe;
+import philosophers.arge.actor.cache.Cache;
 import philosophers.arge.actor.exceptions.OccupiedTopicException;
+import philosophers.arge.actor.terminators.RouterTerminator;
 
 @Data
 @Accessors(chain = true)
@@ -123,6 +125,12 @@ public final class RouterNode implements RouterTerminator {
 		cluster.executeNode(node);
 	}
 
+	@Immutable
+	@ThreadSafe
+	public final Cache getDelayedCache() {
+		return cluster.getCache();
+	}
+
 	/**
 	 * returns Map<String, List<?>> <br>
 	 * ex: <br>
@@ -137,7 +145,7 @@ public final class RouterNode implements RouterTerminator {
 	public Map<String, List<?>> terminateRouter() {
 		Map<String, List<?>> waitingJobs = new HashMap<>();
 		for (String key : rootActors.keySet()) {
-			waitingJobs.put(key, rootActors.get(key).terminate());
+			waitingJobs.put(key, rootActors.get(key).terminateActor());
 		}
 		rootActors.clear();
 		actorCountMap.clear();
@@ -162,7 +170,7 @@ public final class RouterNode implements RouterTerminator {
 	@NotThreadSafe
 	public Map<String, List<?>> terminateTopic(final Topic topic) {
 		Map<String, List<?>> waitingJobs = new HashMap<>();
-		waitingJobs.put(topic.getName(), rootActors.get(topic.getName()).terminate());
+		waitingJobs.put(topic.getName(), rootActors.get(topic.getName()).terminateActor());
 		return waitingJobs;
 	}
 }

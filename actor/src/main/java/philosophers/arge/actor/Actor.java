@@ -23,8 +23,10 @@ import philosophers.arge.actor.annotations.GuardedBy;
 import philosophers.arge.actor.annotations.Immutable;
 import philosophers.arge.actor.annotations.NotThreadSafe;
 import philosophers.arge.actor.annotations.ThreadSafe;
+import philosophers.arge.actor.cache.Cache;
 import philosophers.arge.actor.configs.ActorConfig;
 import philosophers.arge.actor.divisionstrategies.DivisionStrategy;
+import philosophers.arge.actor.terminators.ActorTerminator;
 
 /**
  * Actors itself is {@code NotThreadSafe} because every actor has it's data to
@@ -119,6 +121,10 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T>, 
 
 	public Actor<?> getRootActor(String topic) {
 		return this.router.getRootActor(topic);
+	}
+
+	public Cache getCache() {
+		return getRouter().getDelayedCache();
 	}
 
 	@ThreadSafe
@@ -361,11 +367,11 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T>, 
 	 * {@code Status.PASSIVE}
 	 * 
 	 */
-	public List<ActorMessage<T>> terminate() {
+	public List<ActorMessage<T>> terminateActor() {
 		Thread.currentThread().interrupt();
 		this.cb.setStatus(Status.PASSIVE);
 		if (childActor != null) {
-			queue.addAll(childActor.terminate());
+			queue.addAll(childActor.terminateActor());
 		}
 		List<ActorMessage<T>> response = queue;
 		queue = new LinkedList<>();

@@ -11,6 +11,7 @@ import lombok.experimental.Accessors;
 import philosophers.arge.actor.Actor;
 import philosophers.arge.actor.ActorMessage;
 import philosophers.arge.actor.annotations.Immutable;
+import philosophers.arge.actor.annotations.NotImplemented;
 
 /**
  * This division strategy changes divison number according to the input value
@@ -21,6 +22,9 @@ import philosophers.arge.actor.annotations.Immutable;
  *
  * @param <T>
  */
+
+//TODO:implement autodivision
+@NotImplemented
 @Immutable
 @Data
 @Accessors(chain = true)
@@ -32,20 +36,15 @@ public class AutoDivision<T> implements DivisionStrategy<T> {
 
 	@Override
 	public boolean isConditionValid(Actor<T> actor) {
-		// TODO Auto-generated method stub
 		return false;
 	}
 
 	@Override
 	public void executeSendingStrategy(Actor<T> actor, List<ActorMessage<T>> message) {
-		// TODO Auto-generated method stub
-
 	}
 
 	@Override
 	public void executeLoadingStrategy(Actor<T> actor, List<ActorMessage<T>> message) {
-		// TODO Auto-generated method stub
-
 	}
 
 }
