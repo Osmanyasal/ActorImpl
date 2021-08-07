@@ -11,6 +11,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
+
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.Getter;
@@ -26,14 +33,15 @@ import philosophers.arge.actor.annotations.ThreadSafe;
 import philosophers.arge.actor.cache.DelayedCache;
 import philosophers.arge.actor.configs.ClusterConfig;
 import philosophers.arge.actor.exceptions.InvalidTopicException;
+import philosophers.arge.actor.serializers.JsonSeriliazer;
 import philosophers.arge.actor.terminators.ClusterTerminator;
 
 @Data
 @Accessors(chain = true)
 @FieldNameConstants
-public class ActorCluster implements ClusterTerminator {
+public class ActorCluster implements ClusterTerminator, JsonSeriliazer {
 	private final String terminatedMessage;
-
+	private final String allTasksAreDoneMessage;
 	@Setter(AccessLevel.PRIVATE)
 	private String name;
 
@@ -62,7 +70,19 @@ public class ActorCluster implements ClusterTerminator {
 	@Setter(AccessLevel.PRIVATE)
 	private ExecutorService pool;
 
+	@Exclude
+	@Setter(AccessLevel.PRIVATE)
+	@Getter(AccessLevel.PRIVATE)
+	private ClusterConfig config;
+
+	@Exclude
+	@Setter(AccessLevel.PRIVATE)
+	@Getter(AccessLevel.PRIVATE)
+	private Logger logger;
+
 	public ActorCluster(ClusterConfig config) {
+		this.config = config;
+		allTasksAreDoneMessage = "All tasks are done!";
 		terminatedMessage = String.format("Cluster '%s' Terminated!", config.getName());
 		adjustConfigurations(config);
 		init();
@@ -71,6 +91,7 @@ public class ActorCluster implements ClusterTerminator {
 
 	@Immutable
 	private final void init() {
+		this.logger = LogManager.getLogger(ActorCluster.class);
 		this.futures = new HashMap<>();
 		this.poolLock = new ReentrantLock();
 		this.router = new RouterNode(this);
@@ -139,7 +160,7 @@ public class ActorCluster implements ClusterTerminator {
 	@Immutable
 	@ThreadSafe
 	@GuardedBy(ActorCluster.Fields.poolLock)
-	public void abortThreadPoolTasks() throws InterruptedException {
+	public final void abortThreadPoolTasks() {
 		poolLock.lock();
 		try {
 			for (String key : futures.keySet()) {
@@ -156,7 +177,7 @@ public class ActorCluster implements ClusterTerminator {
 		try {
 			pool.awaitTermination(1, TimeUnit.SECONDS);
 		} catch (InterruptedException e) {
-			// do nothing.
+			logger.warn(e.getStackTrace());
 		} finally {
 			if (!pool.isTerminated()) {
 				return pool.shutdownNow();
@@ -196,8 +217,7 @@ public class ActorCluster implements ClusterTerminator {
 				result.put("Pool_Waiting_Queue", terminateThreadPool());
 			this.cb.setStatus(Status.PASSIVE);
 			if (showInfo)
-				System.out.println(terminatedMessage);
-
+				logger.info(terminatedMessage);
 			System.gc();
 		}
 		return result;
@@ -213,7 +233,7 @@ public class ActorCluster implements ClusterTerminator {
 			waitForTermination(allTopics.get(i), showInfo);
 		}
 		if (showInfo)
-			System.out.println("All tasks are done!");
+			logger.info(allTasksAreDoneMessage);
 		System.gc();
 	}
 
@@ -236,8 +256,18 @@ public class ActorCluster implements ClusterTerminator {
 			Thread.sleep(5);
 		} while (!isAllTerminated);
 		if (showInfo)
-			System.out.println(topic + " tasks are done!");
+			logger.info((topic + " " + allTasksAreDoneMessage));
 		System.gc();
 		return true;
+	}
+
+	@Override
+	public final String toJson() {
+		Gson gson = new GsonBuilder().create();
+		Map<String, String> keyValuePairs = new HashMap<String, String>();
+		keyValuePairs.put(ActorCluster.class.getSimpleName(), gson.toJson(getConfig()));
+		keyValuePairs.putAll(gson.fromJson(getRouter().toJson(), new TypeToken<Map<String, String>>() {
+		}.getType()));
+		return gson.toJson(keyValuePairs);
 	}
 }

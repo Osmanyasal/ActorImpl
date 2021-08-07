@@ -9,7 +9,12 @@ import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.springframework.util.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 import lombok.AccessLevel;
 import lombok.Data;
@@ -21,16 +26,18 @@ import lombok.experimental.FieldNameConstants;
 import philosophers.arge.actor.ControlBlock.Status;
 import philosophers.arge.actor.annotations.GuardedBy;
 import philosophers.arge.actor.annotations.Immutable;
+import philosophers.arge.actor.annotations.NotImplemented;
 import philosophers.arge.actor.annotations.NotThreadSafe;
 import philosophers.arge.actor.annotations.ThreadSafe;
 import philosophers.arge.actor.cache.Cache;
 import philosophers.arge.actor.exceptions.OccupiedTopicException;
+import philosophers.arge.actor.serializers.JsonSeriliazer;
 import philosophers.arge.actor.terminators.RouterTerminator;
 
 @Data
 @Accessors(chain = true)
 @FieldNameConstants
-public final class RouterNode implements RouterTerminator {
+public final class RouterNode implements RouterTerminator, JsonSeriliazer {
 
 	@Setter(value = AccessLevel.PRIVATE)
 	private ControlBlock cb;
@@ -43,21 +50,27 @@ public final class RouterNode implements RouterTerminator {
 	@Getter(value = AccessLevel.PRIVATE)
 	private Map<String, Actor<?>> rootActors;
 
+	@Exclude
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
-	@Exclude
 	private ActorCluster cluster;
 
+	@Exclude
 	@Getter(value = AccessLevel.PRIVATE)
 	@Setter(value = AccessLevel.PRIVATE)
-	@Exclude
 	private ReadWriteLock lock;
+
+	@Exclude
+	@Setter(AccessLevel.PRIVATE)
+	@Getter(AccessLevel.PRIVATE)
+	private Logger logger;
 
 	public RouterNode(ActorCluster cluster) {
 		init(cluster);
 	}
 
 	private void init(ActorCluster cluster) {
+		this.logger = LogManager.getLogger(RouterNode.class);
 		this.cb = ControlBlockFactory.createCb(ActorType.ROUTER);
 		this.cluster = cluster;
 		this.rootActors = new LinkedHashMap<>();
@@ -162,7 +175,8 @@ public final class RouterNode implements RouterTerminator {
 	}
 
 	/**
-	 * Terminates the given topic with all its nodes.
+	 * Terminates the given topic with all its nodes. returns the waiting jobs
+	 * attached to that topic.
 	 * 
 	 * @param topic
 	 * @return
@@ -172,5 +186,16 @@ public final class RouterNode implements RouterTerminator {
 		Map<String, List<?>> waitingJobs = new HashMap<>();
 		waitingJobs.put(topic.getName(), rootActors.get(topic.getName()).terminateActor());
 		return waitingJobs;
+	}
+
+	@NotImplemented
+	@Override
+	public String toJson() {
+		Gson gson = new GsonBuilder().create();
+		Map<String, String> map = new HashMap<>();
+		for (String actor : rootActors.keySet()) {
+			map.put(actor, rootActors.get(actor).toJson());
+		}
+		return gson.toJson(map);
 	}
 }

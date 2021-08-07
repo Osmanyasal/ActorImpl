@@ -17,17 +17,18 @@ import philosophers.arge.actor.terminators.Terminate;
  * We can easily store some calculated operations results in order to reduce
  * re-calculation time.
  * 
- * 
  * @author osmanyasal
  *
  */
 public class DelayedCache implements Cache, Terminate {
 
-	private final ConcurrentHashMap<String, SoftReference<Object>> cache = new ConcurrentHashMap<>();
-	private final DelayQueue<DelayedCacheObject> cleaningUpQueue = new DelayQueue<>();
+	private final ConcurrentHashMap<String, SoftReference<Object>> cache;
+	private final DelayQueue<DelayedCacheObject> cleaningUpQueue;
 	private Thread cleanerThread;
 
 	public DelayedCache() {
+		cache = new ConcurrentHashMap<>();
+		cleaningUpQueue = new DelayQueue<>();
 		initCleanerThread();
 	}
 

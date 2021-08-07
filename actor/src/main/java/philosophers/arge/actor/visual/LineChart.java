@@ -15,15 +15,17 @@ import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.data.xy.XYSeries;
 
+import philosophers.arge.actor.ActorPriority;
+
 /**
  * Used for drawing performance metrics.
  * 
  * @author osmanyasal
  *
  */
+@SuppressWarnings("serial")
 public class LineChart extends JFrame {
 
-	private static final long serialVersionUID = -1429370178194424829L;
 	private static final String PERFORMANCE_METRICS = "Performance Metrics";
 
 	public LineChart(String xName, String yName, XYSeries... dataSet) {
@@ -58,8 +60,7 @@ public class LineChart extends JFrame {
 			renderer.setSeriesPaint(i, Utils.getRandomColor());
 			renderer.setSeriesStroke(i, new BasicStroke(3f));
 		}
- 
-		
+
 		// sets paint color for plot outlines
 		plot.setOutlinePaint(Color.BLACK);
 		plot.setOutlineStroke(new BasicStroke(2.0f));

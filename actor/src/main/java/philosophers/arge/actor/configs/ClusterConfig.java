@@ -2,14 +2,12 @@ package philosophers.arge.actor.configs;
 
 import java.util.UUID;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.experimental.Accessors;
 import philosophers.arge.actor.ExecutorFactory.ThreadPoolTypes;
 
 @Data
 @Accessors(chain = true)
-@AllArgsConstructor
 public class ClusterConfig {
 
 	private String name;
