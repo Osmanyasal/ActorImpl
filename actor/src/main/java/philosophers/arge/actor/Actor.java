@@ -9,7 +9,12 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.springframework.util.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 import lombok.AccessLevel;
 import lombok.Data;
@@ -21,18 +26,24 @@ import lombok.experimental.FieldNameConstants;
 import philosophers.arge.actor.ControlBlock.Status;
 import philosophers.arge.actor.annotations.GuardedBy;
 import philosophers.arge.actor.annotations.Immutable;
+import philosophers.arge.actor.annotations.NotImplemented;
 import philosophers.arge.actor.annotations.NotThreadSafe;
 import philosophers.arge.actor.annotations.ThreadSafe;
 import philosophers.arge.actor.cache.Cache;
 import philosophers.arge.actor.configs.ActorConfig;
 import philosophers.arge.actor.divisionstrategies.DivisionStrategy;
+import philosophers.arge.actor.divisionstrategies.NoDivision;
+import philosophers.arge.actor.divisionstrategies.NumberBasedDivison;
+import philosophers.arge.actor.serializers.JsonConverter;
 import philosophers.arge.actor.terminators.ActorTerminator;
+import philosophers.arge.actor.utils.RuntimeTypeAdapterFactory;
 
 /**
  * Actors itself is {@code NotThreadSafe} because every actor has it's data to
  * process and runs on a thread.<br>
  * Only some <b>enq()</b> and <b>deq()</b> methods are designed as
- * {@code ThreadSafe} to prevent ambiguity on message passing from other actors
+ * {@code ThreadSafe} to prevent ambiguity on message passing from other
+ * actors<br>
  * 
  * @author osmanyasal
  *
@@ -42,7 +53,8 @@ import philosophers.arge.actor.terminators.ActorTerminator;
 @Data
 @Accessors(chain = true)
 @FieldNameConstants
-public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T>, Comparable<Actor<T>> {
+public abstract class Actor<T>
+		implements Callable<Object>, ActorTerminator<T>, Comparable<Actor<T>>, JsonConverter<Actor<T>> {
 
 	@Setter(value = AccessLevel.PRIVATE)
 	private ControlBlock cb;
@@ -65,6 +77,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T>, 
 	/**
 	 * Every actor might have only one child actor.
 	 */
+
 	@Setter(value = AccessLevel.PRIVATE)
 	private Actor<T> childActor;
 
@@ -82,7 +95,17 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T>, 
 
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
-	private List<Actor<?>> waitList;
+	private List<Topic> waitList;
+
+	@Exclude
+	@Setter(value = AccessLevel.PRIVATE)
+	@Getter(value = AccessLevel.PRIVATE)
+	private ActorConfig<T> config;
+
+	@Exclude
+	@Setter(AccessLevel.PRIVATE)
+	@Getter(AccessLevel.PRIVATE)
+	private Logger logger;
 
 	@Override
 	public final int compareTo(Actor<T> o) {
@@ -104,6 +127,8 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T>, 
 	}
 
 	private void adjustConfigurations(ActorConfig<T> config) {
+		this.logger = LogManager.getLogger(Actor.class);
+		this.config = config;
 		this.topic = config.getTopic();
 		this.router = config.getRouter();
 		this.divisionStrategy = config.getDivisionStrategy();
@@ -131,7 +156,7 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T>, 
 	public final List<String> getWaitListTopics() {
 		List<String> result = new ArrayList<>();
 		if (!CollectionUtils.isEmpty(this.waitList))
-			this.waitList.stream().forEach((x) -> result.add(x.getTopic().getName()));
+			this.waitList.stream().forEach((x) -> result.add(x.getName()));
 		return result;
 	}
 
@@ -394,14 +419,33 @@ public abstract class Actor<T> implements Callable<Object>, ActorTerminator<T>, 
 				operate(deq());
 			}
 			if (Thread.currentThread().interrupted()) {
-				System.out.println("interrupted!");
+				logger.debug("interrupted");
 			}
 		} catch (Exception e) {
+			// log the error
 			e.printStackTrace();
+			// you may re-start the node with the waiting queue or transfer the data to
+			// child nodes.
 		}
 		this.cb.setStatus(Status.PASSIVE);
 		this.isNotified = false;
 		return true;
+	}
+
+	@Override
+	public final String toJson() {
+		@SuppressWarnings("rawtypes")
+		RuntimeTypeAdapterFactory<DivisionStrategy> typeFactory = RuntimeTypeAdapterFactory
+				.of(DivisionStrategy.class, "type").registerSubtype(NumberBasedDivison.class, "NumberBasedDivision")
+				.registerSubtype(NoDivision.class, "NoDivison");
+		Gson gson = new GsonBuilder().registerTypeAdapterFactory(typeFactory).create();
+		return gson.toJson(getConfig());
+	}
+
+	@NotImplemented
+	@Override
+	public final Actor<T> fromJson(String json) {
+		return null;
 	}
 
 	/**

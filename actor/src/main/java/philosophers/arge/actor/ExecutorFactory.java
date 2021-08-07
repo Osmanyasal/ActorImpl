@@ -7,6 +7,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 public final class ExecutorFactory {
+
 	public enum ThreadPoolTypes {
 		FIXED_SIZED, CACHED_SIZED, PRIORITIZED
 	}

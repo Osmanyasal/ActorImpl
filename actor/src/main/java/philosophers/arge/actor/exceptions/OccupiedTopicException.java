@@ -8,4 +8,4 @@ public class OccupiedTopicException extends RuntimeException {
 	public OccupiedTopicException() {
 		super(OCCUPIED_TOPIC);
 	}
-} 
+}

@@ -7,7 +7,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Setter;
 import lombok.experimental.Accessors;
-import philosophers.arge.actor.Actor;
 import philosophers.arge.actor.ActorPriority;
 import philosophers.arge.actor.RouterNode;
 import philosophers.arge.actor.Topic;
@@ -24,7 +23,7 @@ public class ActorConfig<T> {
 	private Topic topic;
 
 	@Setter(AccessLevel.PRIVATE)
-	private RouterNode router;
+	private transient RouterNode router;
 
 	@Setter(AccessLevel.PRIVATE)
 	private DivisionStrategy<T> divisionStrategy;
@@ -33,5 +32,5 @@ public class ActorConfig<T> {
 	private ActorPriority priority;
 
 	@Setter(AccessLevel.PRIVATE)
-	private List<Actor<?>> waitList;
+	private List<Topic> waitList;
 }
