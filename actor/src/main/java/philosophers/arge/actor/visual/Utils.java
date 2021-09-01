@@ -14,19 +14,19 @@ public final class Utils {
 	private Utils() {
 	}
 
+	private static int counter = 0;
 	private static List<Color> colorList;
-	private static Random rnd = new Random();
 	static {
 		colorList = new ArrayList<>();
 		colorList.add(Color.BLACK);
+		colorList.add(Color.RED);
 		colorList.add(Color.BLUE);
-		colorList.add(Color.CYAN);
-		colorList.add(Color.GRAY);
 		colorList.add(Color.GREEN);
-		colorList.add(Color.MAGENTA);
 		colorList.add(Color.ORANGE);
 		colorList.add(Color.PINK);
-		colorList.add(Color.RED);
+		colorList.add(Color.CYAN);
+		colorList.add(Color.GRAY);
+		colorList.add(Color.MAGENTA);
 	}
 
 	public static final XYSeries toXYDataSet(String name, Map<Double, Double> values) {
@@ -48,7 +48,7 @@ public final class Utils {
 	}
 
 	public static final Color getRandomColor() {
-		return colorList.get(rnd.nextInt(colorList.size()));
+		return colorList.get((counter++) % 9);
 	}
 
 }

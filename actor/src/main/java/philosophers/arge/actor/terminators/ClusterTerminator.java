@@ -8,8 +8,8 @@ public interface ClusterTerminator extends Terminable {
 	 * returns remaining tasks on every nodes.
 	 * 
 	 * @param isPermenent
-	 * @param showInfo
+	 * @param verbose
 	 * @return
 	 */
-	Map<String, List<?>> terminateCluster(boolean isPermenent, boolean showInfo);
+	Map<String, List<?>> terminateCluster(boolean isPermenent, boolean verbose);
 }

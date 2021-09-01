@@ -27,7 +27,6 @@ import philosophers.arge.actor.ControlBlock.Status;
 import philosophers.arge.actor.annotations.GuardedBy;
 import philosophers.arge.actor.annotations.Immutable;
 import philosophers.arge.actor.annotations.NotImplemented;
-import philosophers.arge.actor.annotations.NotThreadSafe;
 import philosophers.arge.actor.annotations.ThreadSafe;
 import philosophers.arge.actor.cache.Cache;
 import philosophers.arge.actor.configs.ActorConfig;
@@ -65,19 +64,23 @@ public abstract class Actor<T>
 	@Setter(value = AccessLevel.PRIVATE)
 	private ActorPriority priority;
 
+	// task queue
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
 	private List<ActorMessage<T>> queue;
 
+	@Exclude // exclude for toString() method.
+	@Setter(value = AccessLevel.PRIVATE)
+	@Getter(value = AccessLevel.PRIVATE)
+	private Lock queueLock;
+
+	// the router node of the cluster
 	@Exclude
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
 	private RouterNode router;
 
-	/**
-	 * Every actor might have only one child actor.
-	 */
-
+	// Every actor might have only one child actor.
 	@Setter(value = AccessLevel.PRIVATE)
 	private Actor<T> childActor;
 
@@ -85,12 +88,6 @@ public abstract class Actor<T>
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
 	private boolean isNotified;
-
-	@Exclude
-	@Setter(value = AccessLevel.PRIVATE)
-	@Getter(value = AccessLevel.PRIVATE)
-	private Lock queueLock;
-
 	private DivisionStrategy<T> divisionStrategy;
 
 	@Setter(value = AccessLevel.PRIVATE)
@@ -106,11 +103,6 @@ public abstract class Actor<T>
 	@Setter(AccessLevel.PRIVATE)
 	@Getter(AccessLevel.PRIVATE)
 	private Logger logger;
-
-	@Override
-	public final int compareTo(Actor<T> o) {
-		return Integer.compare(getPriority().priority(), o.getPriority().priority());
-	}
 
 	/**
 	 * Every actor object must have a topic which defines the job they do. And every
@@ -180,13 +172,11 @@ public abstract class Actor<T>
 	}
 
 	@Immutable
-	@NotThreadSafe
 	public final int getQueueSize() {
 		return getQueue().size();
 	}
 
 	@Immutable
-	@NotThreadSafe
 	public final boolean isQueueEmpty() {
 		return getQueue().isEmpty();
 	}
@@ -433,6 +423,11 @@ public abstract class Actor<T>
 	}
 
 	@Override
+	public final int compareTo(Actor<T> o) {
+		return Integer.compare(getPriority().priority(), o.getPriority().priority());
+	}
+
+	@Override
 	public final String toJson() {
 		@SuppressWarnings("rawtypes")
 		RuntimeTypeAdapterFactory<DivisionStrategy> typeFactory = RuntimeTypeAdapterFactory
@@ -454,6 +449,7 @@ public abstract class Actor<T>
 	 * 
 	 * @return
 	 */
+	@NotImplemented
 	private boolean isProcessingAvailable() {
 		return !getQueue().isEmpty() && Status.ACTIVE.equals(cb.getStatus()) && !Thread.currentThread().isInterrupted();
 	}
@@ -463,6 +459,7 @@ public abstract class Actor<T>
 	 * once the actor is executing by a thread of the threadPool, we'll send waiting
 	 * messages to this method to be operated.
 	 */
+	@NotImplemented
 	public abstract void operate(ActorMessage<T> msg);
 
 	/**
@@ -471,5 +468,6 @@ public abstract class Actor<T>
 	 * 
 	 * @return
 	 */
+	@NotImplemented
 	public abstract Actor<T> generateChildActor();
 }

@@ -15,8 +15,6 @@ import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.data.xy.XYSeries;
 
-import philosophers.arge.actor.ActorPriority;
-
 /**
  * Used for drawing performance metrics.
  * 

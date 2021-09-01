@@ -6,7 +6,6 @@ import lombok.AccessLevel;
 import lombok.Data;
 import lombok.Setter;
 import lombok.experimental.Accessors;
-import philosophers.arge.actor.annotations.NotThreadSafe;
 
 /**
  * This is a tag of an object as like {@code ProcessControlBlock}. <br>
@@ -22,7 +21,6 @@ import philosophers.arge.actor.annotations.NotThreadSafe;
  * @author osmanyasal
  *
  */
-@NotThreadSafe
 @Data
 @Accessors(chain = true)
 public class ControlBlock {

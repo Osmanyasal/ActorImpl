@@ -1,9 +1,10 @@
 package philosophers.arge.actor;
 
+import org.apache.logging.log4j.LogManager;
+
 import philosophers.arge.actor.ControlBlock.Status;
 
 public final class ControlBlockFactory {
-
 	private static final String NOT_FOUND = "Actor Type is not valid";
 
 	private ControlBlockFactory() {
@@ -22,7 +23,7 @@ public final class ControlBlockFactory {
 		case WORKER:
 			return new ControlBlock(ActorType.WORKER, Status.PASSIVE, true);
 		default:
-			System.out.println(NOT_FOUND);
+			LogManager.getLogger(ControlBlockFactory.class).info(NOT_FOUND);
 			return null;
 		}
 	}
