@@ -1,26 +1,61 @@
 package philosophers.arge.actor;
 
+import java.lang.ref.SoftReference;
 import java.util.List;
+import java.util.concurrent.DelayQueue;
+import java.util.concurrent.Delayed;
+import java.util.concurrent.TimeUnit;
 
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.Accessors;
-import philosophers.arge.actor.ExecutorFactory.ThreadPoolTypes;
 import philosophers.arge.actor.configs.ActorConfig;
-import philosophers.arge.actor.configs.ClusterConfig;
-import philosophers.arge.actor.divisionstrategies.NumberBasedDivison;
 
 public class Main {
 
-	public static void main(String[] args) {
-		ActorCluster cluster = new ActorCluster(new ClusterConfig(ThreadPoolTypes.FIXED_SIZED, false));
-		ActorConfig<List<String>> config = new ActorConfig<>(new Topic("nodeCounter"), cluster.getRouter(),
-				new NumberBasedDivison<List<String>>(5l), ActorPriority.DEFAULT, null);
-		cluster.addRootActor(new CounterNode(config, "aa"));
-		String json = cluster.toJson();
-		System.out.println(json);
+	public static void main(String[] args) throws InterruptedException {
+//		ActorCluster cluster = new ActorCluster(new ClusterConfig(ThreadPoolTypes.FIXED_SIZED, false));
+//		ActorConfig<List<String>> config = new ActorConfig<>(new Topic("nodeCounter"), cluster.getRouter(),
+//				new NumberBasedDivison<List<String>>(5l), ActorPriority.DEFAULT, null);
+//		cluster.addRootActor(new CounterNode(config, "aa"));
+//		String json = cluster.toJson();
+//		System.out.println(json);
 
+		DelayQueue<DelayedCacheObject> cleaningUpQueue = new DelayQueue<>();
+
+		cleaningUpQueue.add(new DelayedCacheObject("1000", null, System.currentTimeMillis() + 20000));
+		cleaningUpQueue.add(new DelayedCacheObject("10", null, System.currentTimeMillis() + 2000));
+		cleaningUpQueue.add(new DelayedCacheObject("1", null, System.currentTimeMillis() + 2));
+
+		System.out.println(cleaningUpQueue.take().toString());
+		System.out.println(cleaningUpQueue.take().toString());
+		System.out.println(cleaningUpQueue.take().toString());
+		System.out.println("program done!!");
+	}
+}
+
+@ToString
+@AllArgsConstructor
+@EqualsAndHashCode
+class DelayedCacheObject implements Delayed {
+
+	@Getter
+	private final String key;
+	@Getter
+	private final SoftReference<Object> reference;
+	private final long expiryTime;
+
+	@Override
+	public long getDelay(TimeUnit unit) {
+		return unit.convert(expiryTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+	}
+
+	@Override
+	public int compareTo(Delayed o) {
+		return Long.compare(expiryTime, ((DelayedCacheObject) o).expiryTime);
 	}
 }
 
@@ -56,5 +91,4 @@ class CounterNode extends Actor<List<String>> {
 				count++;
 		}
 	}
-
 }

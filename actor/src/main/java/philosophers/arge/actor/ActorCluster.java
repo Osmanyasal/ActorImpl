@@ -28,7 +28,6 @@ import lombok.experimental.FieldNameConstants;
 import philosophers.arge.actor.ControlBlock.Status;
 import philosophers.arge.actor.annotations.GuardedBy;
 import philosophers.arge.actor.annotations.Immutable;
-import philosophers.arge.actor.annotations.NotThreadSafe;
 import philosophers.arge.actor.annotations.ThreadSafe;
 import philosophers.arge.actor.cache.DelayedCache;
 import philosophers.arge.actor.configs.ClusterConfig;
@@ -40,8 +39,9 @@ import philosophers.arge.actor.terminators.ClusterTerminator;
 @Accessors(chain = true)
 @FieldNameConstants
 public class ActorCluster implements ClusterTerminator, JsonSeriliazer {
-	private final String terminatedMessage;
-	private final String allTasksAreDoneMessage;
+	private static final String CLUSTER_TERMINATED_MESSAGE = " Cluster %s terminated";
+	private static final String ALL_TASKS_ARE_DONE = " All tasks are done!";
+
 	@Setter(AccessLevel.PRIVATE)
 	private String name;
 
@@ -82,8 +82,6 @@ public class ActorCluster implements ClusterTerminator, JsonSeriliazer {
 
 	public ActorCluster(ClusterConfig config) {
 		this.config = config;
-		allTasksAreDoneMessage = "All tasks are done!";
-		terminatedMessage = String.format("Cluster '%s' Terminated!", config.getName());
 		adjustConfigurations(config);
 		init();
 		System.out.println(config);
@@ -106,19 +104,16 @@ public class ActorCluster implements ClusterTerminator, JsonSeriliazer {
 	}
 
 	@Immutable
-	@NotThreadSafe
 	public final int getActiveNodeCount(String topic) {
 		return router.getRootActor(topic).getActiveNodeCount();
 	}
 
 	@Immutable
-	@NotThreadSafe
 	public final int getActiveNodeCount() {
 		return 0;
 	}
 
 	@Immutable
-	@NotThreadSafe
 	public final int getNodeCount(String topic) {
 		int count = 0;
 		Actor<?> actor = this.router.getRootActor(topic);
@@ -152,7 +147,7 @@ public class ActorCluster implements ClusterTerminator, JsonSeriliazer {
 
 	@Immutable
 	@ThreadSafe
-	@GuardedBy(RouterNode.Fields.lock)
+	@GuardedBy("concurrentHashMap")
 	public final <T> void addRootActor(Actor<T> node) {
 		router.addRootActor(node.getTopic(), node);
 	}
@@ -217,14 +212,13 @@ public class ActorCluster implements ClusterTerminator, JsonSeriliazer {
 				result.put("Pool_Waiting_Queue", terminateThreadPool());
 			this.cb.setStatus(Status.PASSIVE);
 			if (showInfo)
-				logger.info(terminatedMessage);
+				logger.info(String.format(CLUSTER_TERMINATED_MESSAGE, getName()));
 			System.gc();
 		}
 		return result;
 	}
 
 	@Immutable
-	@NotThreadSafe
 	public final void waitForTermination(boolean showInfo) throws Exception {
 
 		List<String> allTopics = router.getAllTopics();
@@ -233,7 +227,7 @@ public class ActorCluster implements ClusterTerminator, JsonSeriliazer {
 			waitForTermination(allTopics.get(i), showInfo);
 		}
 		if (showInfo)
-			logger.info(allTasksAreDoneMessage);
+			logger.info(ALL_TASKS_ARE_DONE);
 		System.gc();
 	}
 
@@ -256,7 +250,7 @@ public class ActorCluster implements ClusterTerminator, JsonSeriliazer {
 			Thread.sleep(5);
 		} while (!isAllTerminated);
 		if (showInfo)
-			logger.info((topic + " " + allTasksAreDoneMessage));
+			logger.info(topic + ALL_TASKS_ARE_DONE);
 		System.gc();
 		return true;
 	}
@@ -264,7 +258,7 @@ public class ActorCluster implements ClusterTerminator, JsonSeriliazer {
 	@Override
 	public final String toJson() {
 		Gson gson = new GsonBuilder().create();
-		Map<String, String> keyValuePairs = new HashMap<String, String>();
+		Map<String, String> keyValuePairs = new HashMap<>();
 		keyValuePairs.put(ActorCluster.class.getSimpleName(), gson.toJson(getConfig()));
 		keyValuePairs.putAll(gson.fromJson(getRouter().toJson(), new TypeToken<Map<String, String>>() {
 		}.getType()));

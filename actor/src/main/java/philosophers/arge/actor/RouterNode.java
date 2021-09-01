@@ -6,8 +6,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.logging.log4j.LogManager;
@@ -27,7 +26,6 @@ import philosophers.arge.actor.ControlBlock.Status;
 import philosophers.arge.actor.annotations.GuardedBy;
 import philosophers.arge.actor.annotations.Immutable;
 import philosophers.arge.actor.annotations.NotImplemented;
-import philosophers.arge.actor.annotations.NotThreadSafe;
 import philosophers.arge.actor.annotations.ThreadSafe;
 import philosophers.arge.actor.cache.Cache;
 import philosophers.arge.actor.exceptions.OccupiedTopicException;
@@ -56,11 +54,6 @@ public final class RouterNode implements RouterTerminator, JsonSeriliazer {
 	private ActorCluster cluster;
 
 	@Exclude
-	@Getter(value = AccessLevel.PRIVATE)
-	@Setter(value = AccessLevel.PRIVATE)
-	private ReadWriteLock lock;
-
-	@Exclude
 	@Setter(AccessLevel.PRIVATE)
 	@Getter(AccessLevel.PRIVATE)
 	private Logger logger;
@@ -73,39 +66,30 @@ public final class RouterNode implements RouterTerminator, JsonSeriliazer {
 		this.logger = LogManager.getLogger(RouterNode.class);
 		this.cb = ControlBlockFactory.createCb(ActorType.ROUTER);
 		this.cluster = cluster;
-		this.rootActors = new LinkedHashMap<>();
 		this.actorCountMap = new HashMap<>();
-		this.lock = new ReentrantReadWriteLock();
+
+		// rootActors must be ordered because of watinig-actors see Actor.class
+		this.rootActors = new ConcurrentHashMap<>(new LinkedHashMap<>());
 	}
 
 	@Immutable
 	@ThreadSafe
-	@GuardedBy(RouterNode.Fields.lock)
+	@GuardedBy("concurrentHashMap")
 	public final void addRootActor(Topic topic, Actor<?> node) {
 		if (rootActors.containsKey(topic.getName()))
 			throw new OccupiedTopicException();
-		lock.writeLock().lock();
-		try {
-			incrementActorCount(topic);
-			rootActors.put(topic.getName(), node);
-		} finally {
-			lock.writeLock().unlock();
-		}
+		rootActors.put(topic.getName(), node);
+		incrementActorCount(topic);
 	}
 
 	@Immutable
 	@ThreadSafe
-	@GuardedBy(RouterNode.Fields.lock)
+	@GuardedBy("concurrentHashMap")
 	// normally it's not a best practice to return wildcard type but!
 	// since the implementer knows that what kind of root actor is calling
 	// we let the implentor to convert the returning actor.
 	public final Actor<?> getRootActor(String topic) {
-		lock.readLock().lock();
-		try {
-			return isTopicExists(topic) ? rootActors.get(topic) : null;
-		} finally {
-			lock.readLock().unlock();
-		}
+		return isTopicExists(topic) ? rootActors.get(topic) : null;
 	}
 
 	@Immutable
@@ -115,7 +99,6 @@ public final class RouterNode implements RouterTerminator, JsonSeriliazer {
 	}
 
 	@Immutable
-	@NotThreadSafe
 	public final List<String> getAllTopics() {
 		List<String> result = new ArrayList<>(rootActors.keySet());
 		Collections.reverse(result);
@@ -123,7 +106,6 @@ public final class RouterNode implements RouterTerminator, JsonSeriliazer {
 	}
 
 	@Immutable
-	@NotThreadSafe
 	protected final void incrementActorCount(Topic topic) {
 		if (this.actorCountMap.containsKey(topic.getName()))
 			this.actorCountMap.put(topic.getName(), this.actorCountMap.get(topic.getName()) + 1);
@@ -154,7 +136,6 @@ public final class RouterNode implements RouterTerminator, JsonSeriliazer {
 	 * } <br>
 	 */
 	@Override
-	@NotThreadSafe
 	public Map<String, List<?>> terminateRouter() {
 		Map<String, List<?>> waitingJobs = new HashMap<>();
 		for (String key : rootActors.keySet()) {
@@ -181,14 +162,12 @@ public final class RouterNode implements RouterTerminator, JsonSeriliazer {
 	 * @param topic
 	 * @return
 	 */
-	@NotThreadSafe
 	public Map<String, List<?>> terminateTopic(final Topic topic) {
 		Map<String, List<?>> waitingJobs = new HashMap<>();
 		waitingJobs.put(topic.getName(), rootActors.get(topic.getName()).terminateActor());
 		return waitingJobs;
 	}
 
-	@NotImplemented
 	@Override
 	public String toJson() {
 		Gson gson = new GsonBuilder().create();
