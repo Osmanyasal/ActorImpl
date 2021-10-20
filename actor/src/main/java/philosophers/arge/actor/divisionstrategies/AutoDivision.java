@@ -41,10 +41,12 @@ public class AutoDivision<T> implements DivisionStrategy<T> {
 
 	@Override
 	public void executeSendingStrategy(Actor<T> actor, List<ActorMessage<T>> message) {
+		return;
 	}
 
 	@Override
 	public void executeLoadingStrategy(Actor<T> actor, List<ActorMessage<T>> message) {
+		return;
 	}
 
 }

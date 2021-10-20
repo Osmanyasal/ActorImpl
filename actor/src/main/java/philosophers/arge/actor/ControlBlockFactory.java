@@ -12,7 +12,6 @@ public final class ControlBlockFactory {
 	}
 
 	public static ControlBlock createCb(ActorType type) {
-
 		switch (type) {
 		case ROUTER:
 			return new ControlBlock(ActorType.ROUTER, Status.ACTIVE, true);

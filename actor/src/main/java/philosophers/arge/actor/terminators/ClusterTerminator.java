@@ -11,5 +11,5 @@ public interface ClusterTerminator extends Terminable {
 	 * @param verbose
 	 * @return
 	 */
-	Map<String, List<?>> terminateCluster(boolean isPermenent, boolean verbose);
+	Map<String, List<?>> terminateCluster(boolean isPermenent, boolean isVerbose);
 }

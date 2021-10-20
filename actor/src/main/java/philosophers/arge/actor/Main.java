@@ -26,7 +26,7 @@ public class Main {
 
 		DelayQueue<DelayedCacheObject> cleaningUpQueue = new DelayQueue<>();
 
-		cleaningUpQueue.add(new DelayedCacheObject("1000", null, System.currentTimeMillis() + 20000));
+		cleaningUpQueue.add(new DelayedCacheObject("1000", null, System.currentTimeMillis() + 10000));
 		cleaningUpQueue.add(new DelayedCacheObject("10", null, System.currentTimeMillis() + 2000));
 		cleaningUpQueue.add(new DelayedCacheObject("1", null, System.currentTimeMillis() + 2));
 
