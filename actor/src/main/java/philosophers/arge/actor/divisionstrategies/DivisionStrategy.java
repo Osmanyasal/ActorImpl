@@ -37,8 +37,8 @@ import philosophers.arge.actor.annotations.Immutable;
 public interface DivisionStrategy<T> {
 
 	/**
-	 * before adding a message to the queue, checks if the division rule. if the
-	 * rule is satisfied then execute the strategy that's defined below.
+	 * before adding a message to the queue, checks the division rule. if the rule
+	 * is satisfied then execute the strategy that's defined below.
 	 * 
 	 * @param actor
 	 * @return

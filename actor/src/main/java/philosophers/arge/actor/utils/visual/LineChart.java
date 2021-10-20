@@ -1,4 +1,4 @@
-package philosophers.arge.actor.visual;
+package philosophers.arge.actor.utils.visual;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
