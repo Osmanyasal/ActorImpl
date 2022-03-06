@@ -7,9 +7,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Setter;
 import lombok.experimental.Accessors;
-import par.core.actor.Actor;
-import par.core.actor.ActorMessage;
 import par.core.actor.annotations.Immutable;
+import par.core.actor.base.ActorMessage;
+import par.core.actor.base.node.Actor;
 
 /**
  * If the queue size exceeds our queue limit we create a new child actor and

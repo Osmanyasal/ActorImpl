@@ -8,10 +8,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.Accessors;
-import par.core.actor.Actor;
-import par.core.actor.ActorMessage;
 import par.core.actor.annotations.Immutable;
 import par.core.actor.annotations.NotImplemented;
+import par.core.actor.base.ActorMessage;
+import par.core.actor.base.node.Actor;
 
 /**
  * This division strategy changes divison number according to the input value

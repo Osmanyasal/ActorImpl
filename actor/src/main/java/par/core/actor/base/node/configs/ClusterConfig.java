@@ -1,10 +1,10 @@
-package par.core.actor.configs;
+package par.core.actor.base.node.configs;
 
 import java.util.UUID;
 
 import lombok.Data;
 import lombok.experimental.Accessors;
-import par.core.actor.ExecutorFactory.ThreadPoolTypes;
+import par.core.actor.factories.ExecutorFactory.ThreadPoolTypes;
 
 @Data
 @Accessors(chain = true)

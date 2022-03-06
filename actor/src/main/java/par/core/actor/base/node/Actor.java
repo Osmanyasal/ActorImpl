@@ -1,4 +1,4 @@
-package par.core.actor;
+package par.core.actor.base.node;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -23,16 +23,22 @@ import lombok.Setter;
 import lombok.ToString.Exclude;
 import lombok.experimental.Accessors;
 import lombok.experimental.FieldNameConstants;
-import par.core.actor.ControlBlock.Status;
 import par.core.actor.annotations.GuardedBy;
 import par.core.actor.annotations.Immutable;
 import par.core.actor.annotations.NotImplemented;
 import par.core.actor.annotations.ThreadSafe;
+import par.core.actor.base.ActorMessage;
+import par.core.actor.base.ActorPriority;
+import par.core.actor.base.Type;
+import par.core.actor.base.ControlBlock;
+import par.core.actor.base.ControlBlock.Status;
+import par.core.actor.base.Topic;
+import par.core.actor.base.node.configs.ActorConfig;
 import par.core.actor.cache.Cache;
-import par.core.actor.configs.ActorConfig;
 import par.core.actor.divisionstrategies.DivisionStrategy;
 import par.core.actor.divisionstrategies.NoDivision;
 import par.core.actor.divisionstrategies.NumberBasedDivison;
+import par.core.actor.factories.ControlBlockFactory;
 import par.core.actor.serializers.JsonConverter;
 import par.core.actor.terminators.ActorTerminator;
 import par.core.actor.utils.RuntimeTypeAdapterFactory;
@@ -129,7 +135,7 @@ public abstract class Actor<T>
 	}
 
 	private void init() {
-		this.cb = ControlBlockFactory.createCb(ActorType.WORKER);
+		this.cb = ControlBlockFactory.createCb(Type.WORKER);
 		this.queueLock = new ReentrantLock(true);
 		this.queue = new LinkedList<>();
 		this.isNotified = false;
@@ -357,7 +363,7 @@ public abstract class Actor<T>
 	@Immutable
 	private final Actor<T> initChildActor(Actor<T> node) {
 		this.router.incrementActorCount(node.getTopic());
-		node.getCb().setIsRoot(false);
+		node.getCb().setRoot(false);
 		node.getCb().setStatus(Status.PASSIVE);
 		childActor = node;
 		return node;
@@ -407,7 +413,7 @@ public abstract class Actor<T>
 			while (isProcessingAvailable()) {
 				operate(deq());
 			}
-			if (Thread.currentThread().interrupted()) {
+			if (Thread.interrupted()) {
 				logger.debug("interuption recieved!");
 			}
 		} catch (Exception e) {

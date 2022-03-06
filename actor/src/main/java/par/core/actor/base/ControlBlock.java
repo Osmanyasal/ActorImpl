@@ -1,4 +1,4 @@
-package par.core.actor;
+package par.core.actor.base;
 
 import java.util.UUID;
 
@@ -8,9 +8,9 @@ import lombok.Setter;
 import lombok.experimental.Accessors;
 
 /**
- * This is a tag of an object as like {@code ProcessControlBlock}. <br>
- * By using this tag we can get some information of the object.<br>
- * ex:<br>
+ * This is a tag of a Node just like {@code ProcessControlBlock}. <br>
+ * By using this tag we can get some information of the Node.<br>
+ * contains:<br>
  * <ul>
  * <li>id</li>
  * <li>status</li>
@@ -18,7 +18,7 @@ import lombok.experimental.Accessors;
  * <li>type</li>
  * </ul>
  * 
- * @author osmanyasal
+ * @author osman.yasal
  *
  */
 @Data
@@ -27,18 +27,16 @@ public class ControlBlock {
 	public enum Status {
 		ACTIVE, PASSIVE
 	}
-
 	@Setter(value = AccessLevel.PRIVATE)
 	private String id;
 
 	@Setter(value = AccessLevel.PRIVATE)
-	private ActorType type;
+	private Type type;
 
-	private Boolean isRoot;
-
+	private boolean isRoot;
 	private Status status;
 
-	public ControlBlock(ActorType type, Status status, boolean isRoot) {
+	public ControlBlock(Type type, Status status, boolean isRoot) {
 		this.id = UUID.randomUUID().toString();
 		this.status = status;
 		this.type = type;

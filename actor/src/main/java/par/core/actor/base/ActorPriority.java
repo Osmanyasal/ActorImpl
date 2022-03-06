@@ -1,4 +1,4 @@
-package par.core.actor;
+package par.core.actor.base;
 
 public enum ActorPriority {
 	MAX(0), HIGH(100), MEDIUM(200), LOW(300), VERY_LOW(400), DEFAULT(500);

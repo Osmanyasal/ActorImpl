@@ -4,9 +4,9 @@ import java.util.List;
 
 import lombok.Data;
 import lombok.experimental.Accessors;
-import par.core.actor.Actor;
-import par.core.actor.ActorMessage;
 import par.core.actor.annotations.Immutable;
+import par.core.actor.base.ActorMessage;
+import par.core.actor.base.node.Actor;
 
 @Immutable
 @Data

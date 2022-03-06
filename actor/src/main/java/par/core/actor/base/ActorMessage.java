@@ -1,4 +1,4 @@
-package par.core.actor;
+package par.core.actor.base;
 
 import java.util.UUID;
 
@@ -8,6 +8,13 @@ import lombok.Setter;
 import lombok.experimental.Accessors;
 import par.core.actor.annotations.Immutable;
 
+/**
+ * Immutability of the ActorMessage.message field belongs to the user.
+ * 
+ * @author osman.yasal
+ *
+ * @param <T>
+ */
 @Immutable
 @Data
 @Accessors(chain = true)

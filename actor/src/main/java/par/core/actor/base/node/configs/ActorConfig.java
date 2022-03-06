@@ -1,4 +1,4 @@
-package par.core.actor.configs;
+package par.core.actor.base.node.configs;
 
 import java.util.List;
 
@@ -7,10 +7,10 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Setter;
 import lombok.experimental.Accessors;
-import par.core.actor.ActorPriority;
-import par.core.actor.RouterNode;
-import par.core.actor.Topic;
 import par.core.actor.annotations.Immutable;
+import par.core.actor.base.ActorPriority;
+import par.core.actor.base.Topic;
+import par.core.actor.base.node.RouterNode;
 import par.core.actor.divisionstrategies.DivisionStrategy;
 
 @Immutable

@@ -1,4 +1,4 @@
-package par.core.actor;
+package par.core.actor.base.node;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,13 +25,16 @@ import lombok.Setter;
 import lombok.ToString.Exclude;
 import lombok.experimental.Accessors;
 import lombok.experimental.FieldNameConstants;
-import par.core.actor.ControlBlock.Status;
 import par.core.actor.annotations.GuardedBy;
 import par.core.actor.annotations.Immutable;
 import par.core.actor.annotations.ThreadSafe;
+import par.core.actor.base.Type;
+import par.core.actor.base.ControlBlock;
+import par.core.actor.base.ControlBlock.Status;
+import par.core.actor.base.node.configs.ClusterConfig;
 import par.core.actor.cache.DelayedCache;
-import par.core.actor.configs.ClusterConfig;
 import par.core.actor.exceptions.InvalidTopicException;
+import par.core.actor.factories.ExecutorFactory;
 import par.core.actor.serializers.JsonSeriliazer;
 import par.core.actor.terminators.ClusterTerminator;
 
@@ -98,7 +101,7 @@ public class ActorCluster implements ClusterTerminator, JsonSeriliazer {
 
 	@Immutable
 	private final void adjustConfigurations(ClusterConfig config) {
-		this.cb = new ControlBlock(config.isDeamon() ? ActorType.DEAMON : ActorType.CLUSTER, Status.ACTIVE, true);
+		this.cb = new ControlBlock(config.isDeamon() ? Type.DEAMON : Type.CLUSTER, Status.ACTIVE, true);
 		this.name = config.getName();
 		this.pool = ExecutorFactory.getExecutor(config.getPoolType(), config.getThreadCount());
 	}

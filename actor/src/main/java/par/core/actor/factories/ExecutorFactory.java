@@ -1,4 +1,4 @@
-package par.core.actor;
+package par.core.actor.factories;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;

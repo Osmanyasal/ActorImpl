@@ -2,9 +2,9 @@ package par.core.actor.divisionstrategies;
 
 import java.util.List;
 
-import par.core.actor.Actor;
-import par.core.actor.ActorMessage;
 import par.core.actor.annotations.Immutable;
+import par.core.actor.base.ActorMessage;
+import par.core.actor.base.node.Actor;
 
 /**
  * A base division strategy template<br>

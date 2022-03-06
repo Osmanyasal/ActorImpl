@@ -1,4 +1,4 @@
-package par.core.actor;
+package par.core.actor.base.node;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -22,12 +22,15 @@ import lombok.Setter;
 import lombok.ToString.Exclude;
 import lombok.experimental.Accessors;
 import lombok.experimental.FieldNameConstants;
-import par.core.actor.ControlBlock.Status;
 import par.core.actor.annotations.GuardedBy;
-import par.core.actor.annotations.Immutable;
 import par.core.actor.annotations.ThreadSafe;
+import par.core.actor.base.ControlBlock;
+import par.core.actor.base.ControlBlock.Status;
+import par.core.actor.base.Topic;
+import par.core.actor.base.Type;
 import par.core.actor.cache.Cache;
 import par.core.actor.exceptions.OccupiedTopicException;
+import par.core.actor.factories.ControlBlockFactory;
 import par.core.actor.serializers.JsonSeriliazer;
 import par.core.actor.terminators.RouterTerminator;
 
@@ -63,7 +66,7 @@ public final class RouterNode implements RouterTerminator, JsonSeriliazer {
 
 	private void init(ActorCluster cluster) {
 		this.logger = LogManager.getLogger(RouterNode.class);
-		this.cb = ControlBlockFactory.createCb(ActorType.ROUTER);
+		this.cb = ControlBlockFactory.createCb(Type.ROUTER);
 		this.cluster = cluster;
 		this.actorCountMap = new HashMap<>();
 
@@ -71,7 +74,6 @@ public final class RouterNode implements RouterTerminator, JsonSeriliazer {
 		this.rootActors = new ConcurrentHashMap<>(new LinkedHashMap<>());
 	}
 
-	@Immutable
 	@ThreadSafe
 	@GuardedBy("concurrentHashMap")
 	public final void addRootActor(Topic topic, Actor<?> node) {
@@ -81,7 +83,6 @@ public final class RouterNode implements RouterTerminator, JsonSeriliazer {
 		incrementActorCount(topic);
 	}
 
-	@Immutable
 	@ThreadSafe
 	@GuardedBy("concurrentHashMap")
 	// normally it's not a best practice to return wildcard type but!
@@ -91,20 +92,18 @@ public final class RouterNode implements RouterTerminator, JsonSeriliazer {
 		return isTopicExists(topic) ? rootActors.get(topic) : null;
 	}
 
-	@Immutable
 	@ThreadSafe
+	@GuardedBy("concurrentHashMap")
 	public final boolean isTopicExists(String topic) {
 		return rootActors.containsKey(topic);
 	}
 
-	@Immutable
 	public final List<String> getAllTopics() {
 		List<String> result = new ArrayList<>(rootActors.keySet());
 		Collections.reverse(result);
 		return result;
 	}
 
-	@Immutable
 	protected final void incrementActorCount(Topic topic) {
 		if (this.actorCountMap.containsKey(topic.getName()))
 			this.actorCountMap.put(topic.getName(), this.actorCountMap.get(topic.getName()) + 1);
@@ -112,14 +111,12 @@ public final class RouterNode implements RouterTerminator, JsonSeriliazer {
 			this.actorCountMap.put(topic.getName(), 1);
 	}
 
-	@Immutable
 	@ThreadSafe
 	@GuardedBy(ActorCluster.Fields.poolLock)
 	public final void executeNode(Actor<?> node) {
 		cluster.executeNode(node);
 	}
 
-	@Immutable
 	@ThreadSafe
 	public final Cache getDelayedCache() {
 		return cluster.getCache();
