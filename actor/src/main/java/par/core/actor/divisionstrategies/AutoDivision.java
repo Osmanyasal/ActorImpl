@@ -9,7 +9,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 import par.core.actor.annotations.Immutable;
-import par.core.actor.annotations.NotImplemented;
 import par.core.actor.base.ActorMessage;
 import par.core.actor.base.node.Actor;
 
@@ -18,13 +17,12 @@ import par.core.actor.base.node.Actor;
  * <b>DYNAMICALLY.</b> <br>
  * Uses deep neural network in order to do this.
  * 
- * @author osmanyasal
+ * @author osman.yasal
  *
  * @param <T>
  */
 
 //TODO:implement autodivision
-@NotImplemented
 @Immutable
 @Data
 @Accessors(chain = true)

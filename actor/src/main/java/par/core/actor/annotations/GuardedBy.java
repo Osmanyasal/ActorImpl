@@ -9,7 +9,7 @@ import java.lang.annotation.Target;
 /**
  * Indicates that what locking object is used.
  * 
- * @author osmanyasal
+ * @author osman.yasal
  *
  */
 @Target({ FIELD, METHOD, CONSTRUCTOR })

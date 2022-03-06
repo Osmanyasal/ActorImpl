@@ -6,7 +6,7 @@ package par.core.actor.terminators;
  * This interface implies that the related object has a life circle and it's
  * terminable.
  * 
- * @author osmanyasal
+ * @author osman.yasal
  *
  */
 public interface Terminable {

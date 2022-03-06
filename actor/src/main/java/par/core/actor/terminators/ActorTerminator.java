@@ -5,5 +5,5 @@ import java.util.List;
 import par.core.actor.base.ActorMessage;
 
 public interface ActorTerminator<T> extends Terminable {
-	List<ActorMessage<T>> terminateActor();
+	List<ActorMessage<T>> terminateActor(boolean isRecursively);
 }

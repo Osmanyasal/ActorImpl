@@ -13,7 +13,7 @@ import java.lang.annotation.Target;
  * Which means we can call the method or class in different threads
  * symentanously.
  * 
- * @author osmanyasal
+ * @author osman.yasal
  *
  */
 

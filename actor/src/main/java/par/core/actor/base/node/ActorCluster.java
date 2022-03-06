@@ -26,11 +26,10 @@ import lombok.ToString.Exclude;
 import lombok.experimental.Accessors;
 import lombok.experimental.FieldNameConstants;
 import par.core.actor.annotations.GuardedBy;
-import par.core.actor.annotations.Immutable;
 import par.core.actor.annotations.ThreadSafe;
-import par.core.actor.base.Type;
 import par.core.actor.base.ControlBlock;
 import par.core.actor.base.ControlBlock.Status;
+import par.core.actor.base.Type;
 import par.core.actor.base.node.configs.ClusterConfig;
 import par.core.actor.cache.DelayedCache;
 import par.core.actor.exceptions.InvalidTopicException;
@@ -90,7 +89,6 @@ public class ActorCluster implements ClusterTerminator, JsonSeriliazer {
 		System.out.println(config);
 	}
 
-	@Immutable
 	private final void init() {
 		this.logger = LogManager.getLogger(ActorCluster.class);
 		this.futures = new HashMap<>();
@@ -99,24 +97,20 @@ public class ActorCluster implements ClusterTerminator, JsonSeriliazer {
 		this.cache = new DelayedCache();
 	}
 
-	@Immutable
 	private final void adjustConfigurations(ClusterConfig config) {
 		this.cb = new ControlBlock(config.isDeamon() ? Type.DEAMON : Type.CLUSTER, Status.ACTIVE, true);
 		this.name = config.getName();
 		this.pool = ExecutorFactory.getExecutor(config.getPoolType(), config.getThreadCount());
 	}
 
-	@Immutable
 	public final int getActiveNodeCount(String topic) {
 		return router.getRootActor(topic).getActiveNodeCount();
 	}
 
-	@Immutable
 	public final int getActiveNodeCount() {
 		return 0;
 	}
 
-	@Immutable
 	public final int getNodeCount(String topic) {
 		int count = 0;
 		Actor<?> actor = this.router.getRootActor(topic);
@@ -127,7 +121,6 @@ public class ActorCluster implements ClusterTerminator, JsonSeriliazer {
 		return count;
 	}
 
-	@Immutable
 	@ThreadSafe
 	@GuardedBy(ActorCluster.Fields.poolLock)
 	public final void executeNode(Actor<?> node) {
@@ -148,14 +141,12 @@ public class ActorCluster implements ClusterTerminator, JsonSeriliazer {
 		}
 	}
 
-	@Immutable
 	@ThreadSafe
 	@GuardedBy("concurrentHashMap")
 	public final <T> void addRootActor(Actor<T> node) {
 		router.addRootActor(node.getTopic(), node);
 	}
 
-	@Immutable
 	@ThreadSafe
 	@GuardedBy(ActorCluster.Fields.poolLock)
 	public final void abortThreadPoolTasks() {
@@ -223,7 +214,6 @@ public class ActorCluster implements ClusterTerminator, JsonSeriliazer {
 		return result;
 	}
 
-	@Immutable
 	public final void waitForTermination(boolean showInfo) throws Exception {
 
 		List<String> allTopics = router.getAllTopics();
@@ -237,7 +227,6 @@ public class ActorCluster implements ClusterTerminator, JsonSeriliazer {
 		System.gc();
 	}
 
-	@Immutable
 	public final boolean waitForTermination(String topic, boolean showInfo) throws Exception {
 		if (!router.isTopicExists(topic))
 			throw new InvalidTopicException(topic);

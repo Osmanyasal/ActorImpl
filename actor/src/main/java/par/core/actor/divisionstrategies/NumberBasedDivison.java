@@ -15,7 +15,7 @@ import par.core.actor.base.node.Actor;
  * If the queue size exceeds our queue limit we create a new child actor and
  * deliver incomming messages to it.
  *
- * @author osmanyasal
+ * @author osman.yasal
  *
  * @param <T> : actor message type
  */

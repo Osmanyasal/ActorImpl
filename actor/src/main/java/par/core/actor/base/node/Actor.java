@@ -25,14 +25,13 @@ import lombok.experimental.Accessors;
 import lombok.experimental.FieldNameConstants;
 import par.core.actor.annotations.GuardedBy;
 import par.core.actor.annotations.Immutable;
-import par.core.actor.annotations.NotImplemented;
 import par.core.actor.annotations.ThreadSafe;
 import par.core.actor.base.ActorMessage;
 import par.core.actor.base.ActorPriority;
-import par.core.actor.base.Type;
 import par.core.actor.base.ControlBlock;
 import par.core.actor.base.ControlBlock.Status;
 import par.core.actor.base.Topic;
+import par.core.actor.base.Type;
 import par.core.actor.base.node.configs.ActorConfig;
 import par.core.actor.cache.Cache;
 import par.core.actor.divisionstrategies.DivisionStrategy;
@@ -149,11 +148,10 @@ public abstract class Actor<T>
 		return getRouter().getDelayedCache();
 	}
 
-	@ThreadSafe
 	public final List<String> getWaitListTopics() {
 		List<String> result = new ArrayList<>();
 		if (!CollectionUtils.isEmpty(this.waitList))
-			this.waitList.stream().forEach((x) -> result.add(x.getName()));
+			this.waitList.stream().forEach(x -> result.add(x.getName()));
 		return result;
 	}
 
@@ -161,10 +159,8 @@ public abstract class Actor<T>
 	 * This is a basic snapshoot of the current root-child family. <br>
 	 * after calling this method the active node count both might be increased or
 	 * decrased.
-	 * 
 	 * @return
 	 */
-	@ThreadSafe
 	public final int getActiveNodeCount() {
 		int result = 0;
 		Actor<?> iter = this;
@@ -387,11 +383,11 @@ public abstract class Actor<T>
 	 * {@code Status.PASSIVE}
 	 * 
 	 */
-	public List<ActorMessage<T>> terminateActor() {
+	public List<ActorMessage<T>> terminateActor(boolean isRecursively) {
 		Thread.currentThread().interrupt();
 		this.cb.setStatus(Status.PASSIVE);
-		if (childActor != null) {
-			queue.addAll(childActor.terminateActor());
+		if (childActor != null && isRecursively) {
+			queue.addAll(childActor.terminateActor(isRecursively));
 		}
 		List<ActorMessage<T>> response = queue;
 		queue = new LinkedList<>();
@@ -442,7 +438,6 @@ public abstract class Actor<T>
 		return gson.toJson(getConfig());
 	}
 
-	@NotImplemented
 	@Override
 	public final Actor<T> fromJson(String json) {
 		return null;
@@ -454,7 +449,6 @@ public abstract class Actor<T>
 	 * 
 	 * @return
 	 */
-	@NotImplemented
 	private boolean isProcessingAvailable() {
 		return !getQueue().isEmpty() && Status.ACTIVE.equals(cb.getStatus()) && !Thread.currentThread().isInterrupted();
 	}
@@ -464,7 +458,6 @@ public abstract class Actor<T>
 	 * once the actor is executing by a thread of the threadPool, we'll send waiting
 	 * messages to this method to be operated.
 	 */
-	@NotImplemented
 	public abstract void operate(ActorMessage<T> msg);
 
 	/**
@@ -473,6 +466,5 @@ public abstract class Actor<T>
 	 * 
 	 * @return
 	 */
-	@NotImplemented
 	public abstract Actor<T> generateChildActor();
 }

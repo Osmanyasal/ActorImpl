@@ -42,10 +42,13 @@ public final class RouterNode implements RouterTerminator, JsonSeriliazer {
 	@Setter(value = AccessLevel.PRIVATE)
 	private ControlBlock cb;
 
+	//Hold actor count based on topics
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
 	private Map<String, Integer> actorCountMap;
 
+	
+	//Hold root actors based on theirs topic
 	@Setter(value = AccessLevel.PRIVATE)
 	@Getter(value = AccessLevel.PRIVATE)
 	private Map<String, Actor<?>> rootActors;
@@ -70,7 +73,7 @@ public final class RouterNode implements RouterTerminator, JsonSeriliazer {
 		this.cluster = cluster;
 		this.actorCountMap = new HashMap<>();
 
-		// rootActors must be ordered because of watinig-actors see Actor.class
+		// rootActors must be ordered because of watinig-actors @see Actor.class
 		this.rootActors = new ConcurrentHashMap<>(new LinkedHashMap<>());
 	}
 
@@ -135,7 +138,7 @@ public final class RouterNode implements RouterTerminator, JsonSeriliazer {
 	public Map<String, List<?>> terminateRouter() {
 		Map<String, List<?>> waitingJobs = new HashMap<>();
 		for (String key : rootActors.keySet()) {
-			waitingJobs.put(key, rootActors.get(key).terminateActor());
+			waitingJobs.put(key, rootActors.get(key).terminateActor(true));
 		}
 		rootActors.clear();
 		actorCountMap.clear();
@@ -160,7 +163,7 @@ public final class RouterNode implements RouterTerminator, JsonSeriliazer {
 	 */
 	public Map<String, List<?>> terminateTopic(final Topic topic) {
 		Map<String, List<?>> waitingJobs = new HashMap<>();
-		waitingJobs.put(topic.getName(), rootActors.get(topic.getName()).terminateActor());
+		waitingJobs.put(topic.getName(), rootActors.get(topic.getName()).terminateActor(true));
 		return waitingJobs;
 	}
 

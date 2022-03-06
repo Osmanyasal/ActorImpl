@@ -6,7 +6,7 @@ package par.core.actor.annotations;
  * On method : Indicates that the method is final so it cannot be overritten by
  * it's child.
  * 
- * @author osmanyasal
+ * @author osman.yasal
  *
  */
 @ThreadSafe

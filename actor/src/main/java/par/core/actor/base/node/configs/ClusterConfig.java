@@ -16,7 +16,6 @@ public class ClusterConfig {
 	private boolean isDeamon;
 
 	/**
-	 * 
 	 * @param poolType can be omitted by default creates
 	 *                 {@code FixedSizedThreadPool} with default thread count
 	 */

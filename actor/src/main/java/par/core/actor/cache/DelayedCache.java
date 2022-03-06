@@ -17,7 +17,7 @@ import par.core.actor.terminators.Terminate;
  * We can easily store some calculated operations results in order to reduce
  * re-calculation time.
  * 
- * @author osmanyasal
+ * @author osman.yasal
  *
  */
 public class DelayedCache implements Cache, Terminate {

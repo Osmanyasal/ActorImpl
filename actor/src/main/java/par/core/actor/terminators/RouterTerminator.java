@@ -12,7 +12,7 @@ import java.util.Map;
  * "pool" : [Callable(...),Callable(...)], <br>
  * <br>
  * } <br>
- * @author osmanyasal
+ * @author osman.yasal
  *
  */
 public interface RouterTerminator extends Terminable {

@@ -2,7 +2,7 @@ package par.core.actor.terminators;
 
 /**
  * base terminate operation
- * @author osmanyasal
+ * @author osman.yasal
  *
  */
 public interface Terminate extends Terminable{

@@ -29,7 +29,7 @@ import par.core.actor.base.node.Actor;
  * <li>custom strategies.</li>
  * </ul>
  * 
- * @author osmanyasal
+ * @author osman.yasal
  *
  * @param <T> : actor message type.
  */
@@ -46,7 +46,7 @@ public interface DivisionStrategy<T> {
 	boolean isConditionValid(Actor<T> actor);
 
 	/**
-	 * This strategy is for 'send%' messages, these types of messages uses locking
+	 * This strategy is for sending data one actor to other, these types of messages uses locking
 	 * mechanism.
 	 * 
 	 * @param actor
@@ -55,7 +55,7 @@ public interface DivisionStrategy<T> {
 	void executeSendingStrategy(Actor<T> actor, List<ActorMessage<T>> message);
 
 	/**
-	 * This strategy is for 'load%' messages, these types of messages DON'T use
+	 * This strategy is for sending messages to the parent or it's child actor, these types of messages DON'T use
 	 * locking mechanism.
 	 * 
 	 * @param actor

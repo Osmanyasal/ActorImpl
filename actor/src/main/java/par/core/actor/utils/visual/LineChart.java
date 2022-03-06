@@ -18,7 +18,7 @@ import org.jfree.data.xy.XYSeries;
 /**
  * Used for drawing performance metrics.
  * 
- * @author osmanyasal
+ * @author osman.yasal
  *
  */
 @SuppressWarnings("serial")
